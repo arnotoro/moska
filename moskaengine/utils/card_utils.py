@@ -1,5 +1,6 @@
 import random
 
+
 def choose_random(lst, weights=None):
     """Choose a random element"""
     if weights is None:
@@ -14,7 +15,7 @@ def choose_random_action(poss_actions):
         # Weights are used
         return choose_random(
                 list(map(lambda x: (x[0], x[1]), poss_actions)),
-                weights=list(map(lambda x: x[2], poss_actions))
+                weights = list(map(lambda x: x[2], poss_actions))
             )
     else:
         # Weights are not used

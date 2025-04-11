@@ -1,5 +1,6 @@
 from moskaengine.players.abstract_player import AbstractPlayer
 
+
 class Human(AbstractPlayer):
     def make_copy(self):
         new = Human(self.name)
@@ -23,10 +24,15 @@ class Human(AbstractPlayer):
 
         ### Choose action from allowed actions
         action_types = {action[0] for action in allowed_actions}
+
+        # Print the allowed actions
         print()
-        print([str(c) for c in self.hand])
+        print([c for c in self.hand])
+        print(f'Allowed actions for {self} are:')
+        print([i[0] for i in allowed_actions])
         print([(i[0], i[1]) for i in allowed_actions])
         print(f'What does {self} do?')
+
         if len(action_types) > 1:
             action_types = sorted(action_types)
             idx = eval(input(f'Choose action from {action_types}: '))
@@ -40,11 +46,14 @@ class Human(AbstractPlayer):
 
         if action_type in ['Attack', 'Defend', 'Reflect', 'ReflectTrump']:
             while True:
-                suit = eval(input(f'Suit of the {action_type} card [♣♠♥♦]: '))
-                value = eval(input(f'Value of the {action_type} card [6789*JQKA]: '))
+                suit = int(input(f'Suit of the {action_type} card [♣♠♥♦]: '))
+                value = int(input(f'Value of the {action_type} card [23456789*JQKA]: '))
+                print("Choices are", choices, "and you chose", (suit, value))
                 if (suit, value) in choices:
                     break
-                print(f'Not valid, try again, the choices are [{" ".join("♣♠♥♦"[c[0]] + "6789*JQKA"[c[1]] for c in choices)}]')
+                # Fixed error message formatting
+                valid_cards = " ".join(f"{c[0]}{c[1]}" for c in choices)
+                print(f'Not valid, try again, the choices are [{valid_cards}]')
             return (action_type, (suit, value))
         elif action_type in ['Take', 'PassAttack']:
             return (action_type, None)

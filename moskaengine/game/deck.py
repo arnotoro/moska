@@ -6,12 +6,25 @@ from random import randint, seed, shuffle
 CARD_VALUES = tuple(range(2, 15))
 CARD_VALUES_SYMBOLS = {11: "J", 12: "Q", 13: "K", 14: "A"}
 
-CARD_SUITS = ("H", "D", "C", "S")
-CARD_SUITS_SYMBOLS = {"H": "♥", "D": "♦", "C": "♣", "S": "♠", "X": "X"}
+CARD_SUITS = tuple(range(1, 5))
+CARD_SUITS_SYMBOLS = {1: "♣", 2: "♠", 3: "♥", 4: "♦", "X": "X"}
 
 
 def suit_to_symbol(suit):
-    return CARD_SUITS_SYMBOLS[suit]
+    # Handle None case
+    if suit is None:
+        return "None"
+    # Handle integer input directly
+    if isinstance(suit, int):
+        return CARD_SUITS_SYMBOLS[suit]
+    # Handle tuple input - extract first element if it's a tuple
+    if isinstance(suit, tuple):
+        if len(suit) > 0:
+            return CARD_SUITS_SYMBOLS[suit[0]]  # Use the first element
+        else:
+            return "Unknown"  # Handle empty tuple
+    # Original behavior for string input
+    return CARD_SUITS_SYMBOLS[suit[1:]]
 
 def value_to_letter(value):
     return CARD_VALUES_SYMBOLS[value] if value in CARD_VALUES_SYMBOLS else str(value)
@@ -22,7 +35,6 @@ class Card:
     
     Can be unknown to all, private to holder or public to all.
     """
-
     suit = None
     value = None
     trump_suit = None
@@ -40,9 +52,14 @@ class Card:
             return "-X"
         else:
             if self.is_private:
-                return "P"
+                string = "P"
             else:
-                return f"{self.value}{self.suit}"
+                string = "A"
+            
+            assert self.suit is not None
+            string += suit_to_symbol(self.suit)
+            string += value_to_letter(self.value)
+            return string
             
     def __repr__(self):
         if self.value in CARD_VALUES_SYMBOLS:
@@ -90,10 +107,10 @@ class Card:
 
         while True:
             suit = eval(input('Suit of the card [♣♠♥♦]: '))
-            value = eval(input('Value of the card [6789*JQKA]: '))
+            value = eval(input('Value of the card [23456789*JQKA]: '))
             if (suit, value) in possible:
                 break
-            print(f'Not valid, try again (one of {" ".join("♣♠♥♦"[i[0]] + "6789*JQKA"[i[1]] for i in possible)})')
+            print(f'Not valid, try again (one of {" ".join("♣♠♥♦"[i[0]] + "23456789*JQKA"[i[1]] for i in possible)})')
         self.suit = suit
         self.value = value
         self.is_unknown = False
@@ -153,3 +170,9 @@ class StandardDeck:
     def place_top(self, card):
         "Place a card at the top of the deck."
         self.cards.appendleft(card)
+
+    def copy(self):
+        "Returns a copy of the deck."
+        new_deck = StandardDeck(shuffle=False, seed_value=self.seed_value)
+        new_deck.cards = self.cards.copy()
+        return new_deck
