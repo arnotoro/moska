@@ -11,20 +11,8 @@ CARD_SUITS_SYMBOLS = {1: "♣", 2: "♠", 3: "♥", 4: "♦", "X": "X"}
 
 
 def suit_to_symbol(suit):
-    # Handle None case
-    if suit is None:
-        return "None"
-    # Handle integer input directly
-    if isinstance(suit, int):
-        return CARD_SUITS_SYMBOLS[suit]
-    # Handle tuple input - extract first element if it's a tuple
-    if isinstance(suit, tuple):
-        if len(suit) > 0:
-            return CARD_SUITS_SYMBOLS[suit[0]]  # Use the first element
-        else:
-            return "Unknown"  # Handle empty tuple
-    # Original behavior for string input
-    return CARD_SUITS_SYMBOLS[suit[1:]]
+    # Convert suit to symbol based on int value
+    return CARD_SUITS_SYMBOLS[suit] if suit in CARD_SUITS_SYMBOLS else str(suit)
 
 def value_to_letter(value):
     return CARD_VALUES_SYMBOLS[value] if value in CARD_VALUES_SYMBOLS else str(value)
@@ -32,40 +20,56 @@ def value_to_letter(value):
 
 class Card:
     """ A regular Moska playing card.
-    
+
     Can be unknown to all, private to holder or public to all.
     """
     suit = None
     value = None
     trump_suit = None
+    kopled = False
 
     # Always one of the following is true
     is_public = False # Does everyone know the card
     is_private = False # Does the holder know the card
     is_unknown = True # Does no one know the card
 
+    def __init__(self, value, suit, kopled = False, trump_suit = None):
+        self.value = value
+        self.suit = suit
+        self.kopled = kopled
+        self.trump_suit = trump_suit
+        self.is_public = False
+        self.is_private = False
+        self.is_unknown = True
+
+    def __hash__(self):
+        return hash((self.value, self.suit))
+
+    def __repr__(self):
+        return str(f"{self.value}{suit_to_symbol(self.suit)}")
+
     def __eq__(self, other):
         return self.suit == other.suit and self.value == other.value
-    
+
+    def __lt__(self, other):
+        return self.value < other.value
+
     def __str__(self):
-        if self.is_unknown:
-            return "-X"
-        else:
-            if self.is_private:
-                string = "P"
-            else:
-                string = "A"
-            
-            assert self.suit is not None
-            string += suit_to_symbol(self.suit)
-            string += value_to_letter(self.value)
-            return string
-            
-    def __repr__(self):
-        if self.value in CARD_VALUES_SYMBOLS:
-            return str(f"{CARD_VALUES_SYMBOLS[self.value]}{suit_to_symbol(self.suit)}")
-        return str(f"{self.value}{suit_to_symbol(self.suit)}")
-    
+        # if self.is_unknown:
+        #     return "-X"
+        # else:
+        #     if self.is_private:
+        #         string = "P"
+        #     else:
+        #         string = "A"
+        #
+        #     assert self.suit is not None
+        #     string += suit_to_symbol(self.suit)
+        #     string += value_to_letter(self.value)
+        #     return string
+
+        return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
+
     def reset(self):
         """Reset values or make unknown (useful for keeping same memory address)"""
         # Keeping the same memory address is adamant for this program
@@ -88,7 +92,7 @@ class Card:
         new.is_private = self.is_private
         new.is_unknown = self.is_unknown
         return new
-    
+
     def is_trump(self):
         """Checks if the current card is a trump card or not"""
         return self.suit == self.trump_suit
@@ -148,9 +152,15 @@ class StandardDeck:
 
     def __str__ (self):
         return f"Deck has {len(self)} cards left"
-    
+
     def __repr__(self):
-        return f"Cards left in the deck: {', '.join(repr(card) for card in self.cards)}"
+        s = ""
+        for card in self.cards:
+            s += str(card) + " "
+        return s
+
+    def __hash__(self):
+        return hash(tuple(self.cards))
     
     def shuffle(self):
         shuffle(self.cards)

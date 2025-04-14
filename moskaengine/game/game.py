@@ -1,6 +1,7 @@
-from moskaengine.game.deck import Card, suit_to_symbol
+from moskaengine.game.deck import Card, suit_to_symbol, StandardDeck
 from moskaengine.utils.card_utils import choose_random
 from moskaengine.players.human_player import Human
+from moskaengine.utils.card_utils import basic_repr_game
 
 
 from itertools import combinations
@@ -25,17 +26,20 @@ class MoskaGame:
     is_end_state = False
     loser = None  # The loser of the game once known
     print_info = True
+    trump_card = None  # The trump card
 
-    def __init__(self, players, computer_shuffle, main_attacker, do_init = True, print_info = True):
+    def __init__(self, players, computer_shuffle, main_attacker, do_init = True, print_info = True, perfect_info = False):
         if not do_init:
             return
-        
+
         self.players = players
         self.computer_shuffle = computer_shuffle
         self.print_info = print_info
+        self.perfect_info = perfect_info
 
         # Initialize the deck
-        self.deck = [Card() for _ in range(52)]
+        self.deck = StandardDeck(shuffle=True)
+        print(repr(self.deck))
 
         # Initialize
         self.all_cards = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
@@ -45,12 +49,36 @@ class MoskaGame:
         # Keep track of actions played in the game
         self.history = []
 
+        # Players draw their hand
+        for player in self.players:
+            player.hand = self.deck.pop(6)
+            print(f"{player} has drawn a hand: {player.hand}")
+
+
+        print(f"Deck after drawing hands: {repr(self.deck)}")
+
+        # Draw trump card
+        self.trump_card = self.deck.pop(1)
+
+        print(f"Trump card: {self.trump_card}")
+
+        # Check if a player has the equivalent of 2 of trump and if so, switch the card
+        for player in self.players:
+            # Find the 2 of trump card in player's hand (if it exists)
+            for card in player.hand:
+                if card.suit == self.trump_card[0].suit and card.value == 2:
+                    player.hand.remove(card)
+                    player.hand.append(self.trump_card[0])
+                    self.deck.place_bottom(card)
+                    print(f"{player} has switched the trump card with their 2 of trump")
+
+                    self.trump_card = [card]  # Wrap in list if that's your format
+                    print(f"The new trump card: {self.trump_card}")
+                    break  # Only allow one player to make the switch
 
         # Initialize the trump card
         if computer_shuffle:
             unknown = self.get_unknown_cards()
-
-
             assert self.all_cards == unknown
 
             # TODO: Change this to be the card after every player has drawn their initial hand
@@ -64,10 +92,13 @@ class MoskaGame:
             self.deck[-1].from_input(self.all_cards)
             self.deck[-1].is_public = True
 
-        # Display trump
-        if self.print_info:
-            # print(suit_to_symbol(self.deck[-1].suit))
-            print(f'The trump is {suit_to_symbol(self.deck[-1].suit)}')
+        # Display trump, NOTE: Not used currently
+        # if self.print_info:
+        #     # print(suit_to_symbol(self.deck[-1].suit))
+        #     print(f'The trump is {suit_to_symbol(self.deck[-1].suit)}')
+
+        # This is for print atm
+        self.trump_card = self.deck[-1]
 
         # Set trump suit
         # TODO: this should be the next card drawn, not bottom.
@@ -81,19 +112,24 @@ class MoskaGame:
             # must be added whenever all possible actions are listed.
             self.deck = player.fill_hand(self.deck)
 
+            # Player has 2 of trump, they can switch it with the trump card
+
+
+
+
         # Initialize the attacking player
         self.new_attack(main_attacker)
-        
-    
+
+
     def get_unknown_cards(self):
         """Returns the (suit, value) pairs of all unknown cards"""
         # remove = set()
         # for card in self.card_collection:
         #     if not card.is_unknown:
         #         remove.add((card.suit, card.value))
-        remove = {(c.suit, c.value) for c in self.card_collection if not c.is_unknown}
+        remove = {(c.suit, c.value) for c in self.card_collection.cards if not c.is_unknown}
         return self.all_cards - remove
-    
+
     def get_non_public_cards(self):
         """Returns the (suit, value) pairs of all unknown cards + private cards"""
         # remove = set()
@@ -114,13 +150,13 @@ class MoskaGame:
                 break
         else:
             raise "Player not found"
-        
+
         # We initialize the players starting from the main attacker
         # A person is still in the game whenever his hand is not empty or if he can draw a card.
         self.attackers = [person for i in range(id, id+active_players)
                             if (len((person := self.players[i%active_players]).hand) > 0 or
                                 len(self.deck) > 0)]
-        
+
         # Check if the game has ended
         if len(self.attackers) == 0:
             # There are no attackers left, the last card got defended, so the last defender lost
@@ -201,6 +237,7 @@ class MoskaGame:
 
                 for suit, value in identities:
                     ### REFLECT
+                    # Note: This means that the defender can reflect the first card that is used to attack. Irrelevant for Moska
 
                     if len(self.pairs_finished) == 0:
                         # Check if you are allowed to make another pile with reflecting
@@ -237,7 +274,7 @@ class MoskaGame:
 
                 for action in defend:
                     play_options[action] += 1 / len(defend)
-                
+
                 for action in reflect:
                     play_options[action] += 1 / len(reflect)
 
@@ -280,12 +317,12 @@ class MoskaGame:
 
         else:
             raise ValueError(f"Unknown action {action}")
-        
+
         if len(possible_actions) == 0:
             raise BaseException(f"No possible actions for {player.name} in {action}")
-        
+
         return possible_actions
-    
+
     def get_id(self):
         return hash(tuple(self.history))
 
@@ -324,7 +361,7 @@ class MoskaGame:
 
         elif action[0] == 'ThrowCards':
             if action[1][0] is not None:
-                
+
                 cards_to_throw = action[1]
 
                 for suit, value in cards_to_throw:
@@ -358,7 +395,7 @@ class MoskaGame:
                 # The defender defended successfully
                 for player in self.draw_order:
                     self.deck = player.fill_hand(self.deck)
-                
+
                 assert self.cards_to_defend == []
 
                 self.new_attack(self.defender.name)
@@ -385,7 +422,7 @@ class MoskaGame:
             # TODO: Check if this is needed for Moska
             # By only having to show the trump you can reflect the cards
             suit, value = action[1]
-            
+
             # You must be the defender to do this
             assert self.player_to_play == self.defender
 
@@ -474,8 +511,15 @@ class MoskaGame:
         if self.is_end_state:
             raise BaseException('This was an end state')
 
+        # Print the current game state
+        # if self.print_info:
+            # print(basic_repr_game(self))
+
         # Choose an action
         action = self.player_to_play.choose_action(self)
+
+
+
         # Display the action
         if self.print_info or not self.computer_shuffle:
             if action[0] in ['Attack', 'Defend', 'Reflect']:
