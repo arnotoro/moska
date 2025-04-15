@@ -13,7 +13,7 @@ def run_simulation(seed):
     return str(game.loser).replace('Player ', '')
 
 if __name__ == '__main__':
-    total_games = 1_000_000
+    total_games = 100_000
     print_every = 10000
     start_time = time.time()
 

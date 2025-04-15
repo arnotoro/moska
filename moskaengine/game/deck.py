@@ -46,7 +46,10 @@ class Card:
         return hash((self.value, self.suit))
 
     def __repr__(self):
-        return str(f"{self.value}{suit_to_symbol(self.suit)}")
+        if self.is_unknown:
+            return "-X"
+        else:
+            return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
 
     def __eq__(self, other):
         return self.suit == other.suit and self.value == other.value

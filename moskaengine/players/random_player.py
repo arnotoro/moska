@@ -1,5 +1,6 @@
 from moskaengine.players.abstract_player import AbstractPlayer
-from moskaengine.utils.card_utils import choose_random_action
+from moskaengine.utils.card_utils import choose_random_action, basic_repr_game
+
 
 class RandomPlayer(AbstractPlayer):
     def make_copy(self):
@@ -13,5 +14,7 @@ class RandomPlayer(AbstractPlayer):
 
         # Get the allowed actions
         allowed_actions = game_state.allowed_plays()
+
+        print(basic_repr_game(game_state))
 
         return choose_random_action(allowed_actions)

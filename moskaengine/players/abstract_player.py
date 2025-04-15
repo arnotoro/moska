@@ -11,7 +11,7 @@ class AbstractPlayer(ABC):
 
     
     def __str__(self):
-        return f"Player {self.name}"
+        return f"{self.name}"
 
     def fill_hand(self, deck):
         """Fill the hand with cards from the deck"""
@@ -27,15 +27,16 @@ class AbstractPlayer(ABC):
                 return deck
             
             # Otherwise, draw the cards
-            card_drawn = deck.pop(0)
+            card_drawn = deck.pop(1)[0]
             self.hand.append(card_drawn)
 
         return deck
     
     def make_cards_known(self, game_state):
         """Make the cards in the hand known to the player"""
-
+        print(self.hand)
         for card in self.hand:
+
             # All cards must be unknown
             if card.is_unknown:
                 unknown = game_state.get_unknown_cards()

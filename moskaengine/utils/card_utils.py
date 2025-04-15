@@ -39,15 +39,16 @@ def basic_repr_game(game_state):
 
     return string
 
-def basic_repr_player_actions(allowed_actions, player):
+def basic_repr_player_actions(action_types, player):
     """Returns a basic representation of the player actions"""
     string = f"Allowed actions for {player}:\n"
     n = 1
-    for i in allowed_actions:
-        if i[0] in ['Attack', 'Defend', 'Reflect', 'ReflectTrump']:
-            string += f"{n}. {str(i[0])} with {suit_to_symbol(i[1][0])}{i[1][1]}\n"
+    # Sort actions
+    for i in sorted(action_types):
+        if i in ['Attack', 'Defend', 'Reflect', 'ReflectTrump']:
+            string += f"{n}. {str(i)}\n"
         else:
-            string += f"{n}. {str(i[0])} {i[1]}\n"
+            string += f"{n}. {str(i)}\n"
         n += 1
 
     return string

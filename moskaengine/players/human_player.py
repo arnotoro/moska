@@ -25,12 +25,12 @@ class Human(AbstractPlayer):
 
         ### Choose action from allowed actions
         action_types = {action[0] for action in allowed_actions}
-
+        print(action_types)
         # Print the game state
         print(basic_repr_game(game_state))
 
         # Print the allowed actions
-        print(basic_repr_player_actions(allowed_actions, self))
+        print(basic_repr_player_actions(action_types, self))
 
         # Print the allowed actions
         # print()
@@ -42,39 +42,54 @@ class Human(AbstractPlayer):
 
         if len(action_types) > 1:
             action_types = sorted(action_types)
-            idx = eval(input(f'Choose action from {action_types} (0 - {len(action_types) - 1}): '))
 
-            # Check if the index is valid
+            # Ask the user to choose an action
             while True:
-                if 1 <= idx <= len(action_types):
-                    break
-                print(f'Not valid, try again (one of {action_types})')
-                idx = eval(input(f'Choose action from {action_types} (0 - {len(action_types) - 1}): '))
+                try:
+                    # Subtract 1 from the input to get the correct index
+                    idx = int(input(f'Choose action (1 - {len(action_types)}): ')) - 1
+                    # Check if the index is valid
+                    if idx in range(0, len(action_types)):
+                        break
+                    else:
+                        print(f'Index not valid, try again.\n')
+                        print(basic_repr_player_actions(action_types, self))
+                except (ValueError, SyntaxError, NameError):
+                    print(f'Not a number, try again.\n')
+                    print(basic_repr_player_actions(action_types, self))
+
             action_type = action_types[idx]
         else:
+            # If there is only one action type, take it by default
             action_type = list(action_types)[0]
 
         choices = [i[1] for i in allowed_actions if i[0] == action_type]
+
         if len(choices) == 1:
-            return (action_type, choices[0])
+            return action_type, choices[0]
 
         if action_type in ['Attack', 'Defend', 'Reflect', 'ReflectTrump']:
             while True:
+                suit = int(input(f'Suit of the {action_type} card [♣♠♥♦] (1 - 4): '))
+                value = int(input(f'Value of the {action_type} card [23456789*JQKA] (2 - 14): '))
+                # print("Choices are", choices, "and you chose", (suit, value))
 
-                suit = int(input(f'Suit of the {action_type} card [♣♠♥♦]: '))
-                value = int(input(f'Value of the {action_type} card [23456789*JQKA]: '))
-                print("Choices are", choices, "and you chose", (suit, value))
                 if (suit, value) in choices:
                     break
+
                 # Fixed error message formatting
                 valid_cards = " ".join(f"{c[0]}{c[1]}" for c in choices)
                 print(f'Not valid, try again, the choices are [{valid_cards}]')
-            return (action_type, (suit, value))
+
+            return action_type, (suit, value)
+
         elif action_type in ['Take', 'PassAttack']:
-            return (action_type, None)
+            return action_type, None
+
         elif action_type == 'ThrowCards':
             idx = eval(input(f'Choose throw from {choices}: '))
-            return (action_type, choices[idx])
+            return action_type, choices[idx]
+
         else:
             raise NotImplementedError
         raise NotImplementedError

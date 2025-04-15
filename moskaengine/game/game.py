@@ -29,6 +29,7 @@ class MoskaGame:
     trump_card = None  # The trump card
 
     def __init__(self, players, computer_shuffle, main_attacker, do_init = True, print_info = True, perfect_info = False):
+
         if not do_init:
             return
 
@@ -37,9 +38,14 @@ class MoskaGame:
         self.print_info = print_info
         self.perfect_info = perfect_info
 
+        # Initialize the player variants
+        self.attackers = None
+        self.defender = None
+        self.current_attacker = None
+
         # Initialize the deck
         self.deck = StandardDeck(shuffle=True)
-        print(repr(self.deck))
+        # print(repr(self.deck))
 
         # Initialize
         self.all_cards = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
@@ -52,58 +58,50 @@ class MoskaGame:
         # Players draw their hand
         for player in self.players:
             player.hand = self.deck.pop(6)
-            print(f"{player} has drawn a hand: {player.hand}")
+            # print(f"{player} has drawn a hand: {player.hand}")
 
 
-        print(f"Deck after drawing hands: {repr(self.deck)}")
+        # print(f"Deck after drawing hands: {repr(self.deck)}")
 
-        # Draw trump card
-        self.trump_card = self.deck.pop(1)
 
-        print(f"Trump card: {self.trump_card}")
 
-        # Check if a player has the equivalent of 2 of trump and if so, switch the card
-        for player in self.players:
-            # Find the 2 of trump card in player's hand (if it exists)
-            for card in player.hand:
-                if card.suit == self.trump_card[0].suit and card.value == 2:
-                    player.hand.remove(card)
-                    player.hand.append(self.trump_card[0])
-                    self.deck.place_bottom(card)
-                    print(f"{player} has switched the trump card with their 2 of trump")
-
-                    self.trump_card = [card]  # Wrap in list if that's your format
-                    print(f"The new trump card: {self.trump_card}")
-                    break  # Only allow one player to make the switch
-
-        # Initialize the trump card
         if computer_shuffle:
             unknown = self.get_unknown_cards()
-            assert self.all_cards == unknown
 
-            # TODO: Change this to be the card after every player has drawn their initial hand
-            # Currently the bottom one is trump (from durak)
-            self.deck[-1].from_suit_value(*choose_random(unknown))
-            self.deck[-1].is_public = True
+            # Draw trump card
+            self.trump_card = self.deck.pop(1)[0]
+            self.trump_card.is_public = True
+            print(f"Trump card: {self.trump_card}")
 
+            # Check if a player has the equivalent of 2 of trump and if so, switch the card
+            for player in self.players:
+                # Find the 2 of trump card in player's hand (if it exists)
+                for card in player.hand:
+                    if card.suit == self.trump_card.suit and card.value == 2:
+                        player.hand.remove(card)
+                        player.hand.append(self.trump_card)
+                        self.deck.place_bottom(card)
+                        print(f"{player} has switched the trump card ({self.trump_card}) with their 2 of trump card ({card})")
+
+                        card.is_public = True
+                        card.is_unknown = False
+                        self.trump_card.is_public = True
+                        self.trump_card.is_unknown = False
+
+                        self.trump_card = card
+                        break
         else:
+            # TODO: Not implemented correctly yet
             # We must shuffle the cards irl
             print("Specify the suit and value of the trump card:")
             self.deck[-1].from_input(self.all_cards)
             self.deck[-1].is_public = True
 
-        # Display trump, NOTE: Not used currently
-        # if self.print_info:
-        #     # print(suit_to_symbol(self.deck[-1].suit))
-        #     print(f'The trump is {suit_to_symbol(self.deck[-1].suit)}')
-
-        # This is for print atm
-        self.trump_card = self.deck[-1]
-
-        # Set trump suit
-        # TODO: this should be the next card drawn, not bottom.
-        for card in self.deck:
-            card.trump_suit = self.deck[-1].suit
+        # TODO: Not sure if this is needed, if is, change the logic to check for trump card. This seems odd.
+        for card in self.deck.cards:
+            card.trump_suit = self.trump_card.suit
+            if card.is_public:
+                print(card)
 
         # Initialize the players
         for player in self.players:
@@ -111,10 +109,6 @@ class MoskaGame:
             # only if the player is not Human the suit and value of the card
             # must be added whenever all possible actions are listed.
             self.deck = player.fill_hand(self.deck)
-
-            # Player has 2 of trump, they can switch it with the trump card
-
-
 
 
         # Initialize the attacking player
@@ -136,7 +130,7 @@ class MoskaGame:
         # for card in self.card_collection:
         #     if card.is_public:
         #         remove.add((card.suit, card.value))
-        remove = {(c.suit, c.value) for c in self.card_collection if c.is_public}
+        remove = {(c.suit, c.value) for c in self.card_collection.cards if c.is_public}
         return self.all_cards - remove
 
     def new_attack(self, main_attacker):
@@ -394,7 +388,9 @@ class MoskaGame:
             if self.player_to_play == self.last_played_attacker:
                 # The defender defended successfully
                 for player in self.draw_order:
+
                     self.deck = player.fill_hand(self.deck)
+                    print(self.deck, player.hand)
 
                 assert self.cards_to_defend == []
 
