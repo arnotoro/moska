@@ -1,5 +1,6 @@
 from moskaengine.players.abstract_player import AbstractPlayer
 from moskaengine.utils.card_utils import basic_repr_game, basic_repr_player_actions
+from moskaengine.utils.player_utils import has_combinations
 
 
 class Human(AbstractPlayer):
@@ -25,7 +26,7 @@ class Human(AbstractPlayer):
 
         ### Choose action from allowed actions
         action_types = {action[0] for action in allowed_actions}
-        print(action_types)
+        print(allowed_actions)
         # Print the game state
         print(basic_repr_game(game_state))
 
@@ -68,7 +69,41 @@ class Human(AbstractPlayer):
         if len(choices) == 1:
             return action_type, choices[0]
 
-        if action_type in ['Attack', 'Defend', 'Reflect', 'ReflectTrump']:
+        if action_type == 'Attack':
+            while True:
+                # Get the input from user
+                move_input = input(f"Enter the card(s) for {action_type} as tuples separated by space. [♣♠♥♦] (1 - 4, 2 - 14): ")
+
+                # Parse the input
+                try:
+                    move = move_input.split()
+                    selected = []
+
+                    for card in move:
+                        suit, value = card.split(',')
+                        selected.append((int(suit), int(value)))
+
+                    # Validate cards
+                    if all(card in choices for card in selected):
+
+                        if len(selected) > 1:
+                            values = [card[1] for card in selected]
+                            if len(set(values)) == 1:
+                                return action_type, selected
+                            else:
+                                print("Error: When playing multiple cards, all must have the same value.")
+                                continue
+                        else:
+                            return action_type, selected[0]
+                    else:
+                        invalid_cards = [card for card in selected if card not in choices]
+                        print(f"Invalid card(s): {invalid_cards}")
+                        valid_cards = " ".join(f"{c[0]},{c[1]}" for c in choices)
+                        print(f"Valid cards are: {valid_cards}")
+                except (ValueError, IndexError, SyntaxError, NameError):
+                    print("Invalid format. Please enter cards as 'suit,value' separated by spaces.")
+
+        elif action_type in ['Defend', 'Reflect', 'ReflectTrump']:
             while True:
                 suit = int(input(f'Suit of the {action_type} card [♣♠♥♦] (1 - 4): '))
                 value = int(input(f'Value of the {action_type} card [23456789*JQKA] (2 - 14): '))
