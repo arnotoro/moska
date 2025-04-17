@@ -184,7 +184,7 @@ class MoskaGame:
         # The action to perform
         self.current_action = 'Attack'
         # Succesfully defended cards as (attack, defend) pairs
-        self.pairs_finished = []
+        self.cards_killed = []
         self.cards_to_defend = []
 
     def allowed_plays(self):
@@ -194,22 +194,19 @@ class MoskaGame:
         possible_actions = []
 
         if action == "Attack":
-            # TODO: Implement the ability to play multiple cards at once if the rules allow it.
             attacker = self.attackers[self.current_attacker]
             assert attacker == player
 
             # List all possible attacks
             possible_plays = player.possible_card_plays(self.get_non_public_cards())
 
-            print(f"Possible plays: {possible_plays}")
-
             # NOTE: here game is already initiated
-            if len(self.pairs_finished) > 0:
+            if len(self.cards_killed) > 0:
                 # There is a pair on the table, the player can pass on attacking
                 possible_actions.append(('PassAttack', None))
 
                 # If no pass, we play cards with same values as those that are played to table
-                values_on_table = {card.value for pair in self.pairs_finished for card in pair}
+                values_on_table = {card.value for pair in self.cards_killed for card in pair}
                 possible_plays = [card for card in possible_plays if card[1] in values_on_table]
 
             # Group cards by value
@@ -222,7 +219,6 @@ class MoskaGame:
             defender_hand_size = len(self.defender.hand)
             current_attack_count = len(self.cards_to_defend)
             max_additional_attacks = defender_hand_size - current_attack_count
-
 
             # Check if table has space to play new cards for the defender
             if max_additional_attacks > 0:
@@ -241,12 +237,16 @@ class MoskaGame:
                                 if len(combination) <= max_additional_attacks:
                                     possible_actions.append(('Attack', combination))
 
-
         elif action == "Defend":
-            to_defend = self.cards_to_defend[0]
-
             # Iterate through the cards in the hand to see which ones can be played
             play_options = defaultdict(int)
+
+            # Get all cards that are to be defended
+            to_defend = self.cards_to_defend[0]
+            # TODO: make it possible to play multiple cards to defend at the same turn
+
+
+
 
             # TODO: Implement the logic for the defender to Koplata from the deck and to play to self.
 
@@ -255,38 +255,15 @@ class MoskaGame:
                     identities = self.get_non_public_cards() - {(card.suit, card.value) for card in player.hand if not card.is_unknown}
                 else:
                     identities = {(card.suit, card.value)}
+                # Note: Identities is a list of cards that are in the hand
 
-                reflect = []
                 defend = []
 
+                ## Defending
                 for suit, value in identities:
-                    ### REFLECT
-                    # Note: This means that the defender can reflect the first card that is used to attack. Irrelevant for Moska
-
-                    if len(self.pairs_finished) == 0:
-                        # Check if you are allowed to make another pile with reflecting
-                        # The hypothetical new defender becomes
-                        new_defender = self.attackers[1 % len(self.attackers)]
-
-                        # The new defender must be able to defend all cards (if he wants)
-                        # with the amount of cards in his hand.
-                        max_new_piles = len(new_defender.hand) - len(self.cards_to_defend)
-
-                        if max_new_piles >= 1:
-                            if value == to_defend.value:
-                                reflect.append(('Reflect', (suit, value)))
-
-                        if max_new_piles >= 0:
-                            # Check if you can reflect the to_defend card by showing your trump
-                            if value == to_defend.value and suit == to_defend.trump_suit:
-                                # Check if we already reflected with this trump this trick
-                                if (suit, value) not in self.reflected_trumps:
-                                    reflect.append(('ReflectTrump', (suit, value)))
-
-                    ### DEFEND
                     # Check if the card can defend the to_defend card
-                    if suit == to_defend.trump_suit and not to_defend.is_trump():
-                        # Can always play trump on a non-trump card
+                    if suit == self.trump_card.suit and not to_defend.is_trump():
+                        # Can always defend with trump on a non-trump card
                         defend.append(('Defend', (suit, value)))
 
                     if suit == to_defend.suit:
@@ -299,8 +276,23 @@ class MoskaGame:
                 for action in defend:
                     play_options[action] += 1 / len(defend)
 
-                for action in reflect:
-                    play_options[action] += 1 / len(reflect)
+
+            ## Koplaus
+            # Allowed if there is not kopled card on the table
+            if not any(defend_card.kopled for defend_card in self.cards_to_defend):
+                # Check if there are cards in the deck
+                if len(self.deck) > 0:
+                    next_card = self.deck.cards[0]
+                    print(f"Next card: {next_card} {to_defend.trump_suit}")
+
+                    # Check if the kopled card could fall a card on the table
+                    if next_card.suit == to_defend.suit and next_card.value > to_defend.value:
+                        possible_actions.append(('PlayFromDeck', (next_card.suit, next_card.value), 1/2, False))
+                    elif next_card.suit == self.trump_card.suit and not to_defend.is_trump():
+                        possible_actions.append(('PlayFromDeck', (next_card.suit, next_card.value), 1/2, False))
+                    else:
+                        # If the kopled card can't fall a card on the table, it must be added to the cards_to_defend
+                        possible_actions.append(('PlayFromDeck', (next_card.suit, next_card.value), 1/2, True))
 
             # Restructure playing options
 
@@ -308,7 +300,7 @@ class MoskaGame:
                 possible_actions.append(key + (weight,))
 
             # You can also pick up only the cards on the table if there is defended cards
-            if self.pairs_finished:
+            if self.cards_killed:
                 possible_actions.append(('TakeDefend', None, 1/2))
 
             # As the defender you can also always pick up all the cards
@@ -321,7 +313,7 @@ class MoskaGame:
             possible_throws = player.possible_card_plays(self.get_non_public_cards())
 
             # You can only throw cards with the same value as those on the table
-            values_on_table = {card.value for pair in self.pairs_finished for card in pair}
+            values_on_table = {card.value for pair in self.cards_killed for card in pair}
 
             values_on_table.update({card.value for card in self.cards_to_defend})
 
@@ -350,6 +342,7 @@ class MoskaGame:
         if len(possible_actions) == 0:
             raise BaseException(f"No possible actions for {player.name} in {action}")
 
+        print(f"Found possible actions: {possible_actions}")
         return possible_actions
 
     def get_id(self):
@@ -378,18 +371,45 @@ class MoskaGame:
             self.current_action = 'Defend'
 
         elif action[0] == 'Defend':
+            # TODO: This needs to be changed for the card to be choosable
             # The defending move from the target player for the current turn
             card_defended = self.cards_to_defend.pop(0)
 
             suit, value = action[1]
             card_played = self.player_to_play.discard_card(self, suit, value)
-            self.pairs_finished += [(card_defended, card_played)]
+            self.cards_killed += [(card_defended, card_played)]
 
             if len(self.cards_to_defend) == 0:
                 # No more cards to defend, switch to attacking
                 self.player_to_play = self.attackers[self.current_attacker
                 ]
                 self.current_action = 'Attack'
+
+        elif action[0] == 'PlayFromDeck':
+            # Draw a card from the deck
+            print(f"PlayFromDeck: {action}")
+            kopled_card = self.deck.pop(1)[0]
+            print(kopled_card)
+            kopled_card.kopled = True
+            kopled_card.is_public = True
+            kopled_card.is_unknown = False
+
+            # If this is true, the card can't fall a card on the table, and therefore it is added to the cards_to_defend
+            if action[1]:
+                self.cards_to_defend.append(kopled_card)
+            # Otherwise, the card can fall a card on the table
+            # TODO: This should be choosable by the player, for now it is the first card
+            else:
+                card_defended = self.cards_to_defend.pop(0)
+                self.cards_killed += [(card_defended, kopled_card)]
+
+            # If all the cards are defended, the game continues accordingly
+            if len(self.cards_to_defend) == 0:
+                # No more cards to defend, switch to attacking
+                self.player_to_play = self.attackers[self.current_attacker
+                ]
+                self.current_action = 'Attack'
+
 
         elif action[0] == 'TakeAll':
             # Take cards from the table, should be only available for the defender
@@ -405,6 +425,7 @@ class MoskaGame:
             self.current_action = 'ThrowCards'
             self.player_to_play = self.attackers[self.current_attacker]
             self.attacker_to_start_throwing = self.current_attacker
+
 
         elif action[0] == 'ThrowCards':
             # PlayToOther i.e. play to table for the defender to fall
@@ -429,7 +450,7 @@ class MoskaGame:
                     self.defender.hand += cards_not_defended
                     self.draw_undefended = False
                 else:
-                    cards_on_table = [card for pair in self.pairs_finished for card in pair]
+                    cards_on_table = [card for pair in self.cards_killed for card in pair]
                     cards_on_table += self.cards_to_defend
                     self.defender.hand += cards_on_table
 
@@ -557,7 +578,7 @@ class MoskaGame:
             new.players[player_idx].hand = [card_ids[id(c)] for c in p.hand]
         new.deck = [card_ids[id(c)] for c in self.deck]
         new.cards_to_defend = [card_ids[id(c)] for c in self.cards_to_defend]
-        new.pairs_finished = [(card_ids[id(p[0])], card_ids[id(p[1])]) for p in self.pairs_finished]
+        new.cards_killed = [(card_ids[id(p[0])], card_ids[id(p[1])]) for p in self.cards_killed]
         return new
 
 

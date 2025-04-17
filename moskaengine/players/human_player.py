@@ -26,7 +26,6 @@ class Human(AbstractPlayer):
 
         ### Choose action from allowed actions
         action_types = {action[0] for action in allowed_actions}
-        print(allowed_actions)
         # Print the game state
         print(basic_repr_game(game_state))
 
@@ -66,7 +65,7 @@ class Human(AbstractPlayer):
 
         choices = [i[1] for i in allowed_actions if i[0] == action_type]
 
-        if len(choices) == 1:
+        if len(choices) == 1 and action_type != 'PlayFromDeck':
             return action_type, choices[0]
 
         if action_type == 'Attack':
@@ -117,6 +116,14 @@ class Human(AbstractPlayer):
                 print(f'Not valid, try again, the choices are [{valid_cards}]')
 
             return action_type, (suit, value)
+
+        elif action_type == 'PlayFromDeck':
+            action_data = [action for action in allowed_actions if action[0] == 'PlayFromDeck']
+            playable_flag = action_data[0][3]
+            print(f'Play from deck: {action_data, playable_flag}')
+
+            return action_type, playable_flag
+
 
         elif action_type in ['Take', 'PassAttack']:
             return action_type, None

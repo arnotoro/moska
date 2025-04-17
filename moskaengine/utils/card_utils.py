@@ -35,7 +35,7 @@ def basic_repr_game(game_state):
         string += f" : {pl.hand}\n"
 
     string += f"Cards to defend : {game_state.cards_to_defend}\n"
-    string += f"Killed cards : {game_state.pairs_finished}\n"
+    string += f"Killed cards : {game_state.cards_killed}\n"
 
     return string
 
