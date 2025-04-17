@@ -3,8 +3,10 @@ from moskaengine.game.game import MoskaGame
 from moskaengine.players.human_player import Human
 from moskaengine.players.random_player import RandomPlayer as Random
 
-siemen = 208751
+siemen = 618027
+print(siemen)
 random.seed(siemen)
+
 
 # print(siemen)
 

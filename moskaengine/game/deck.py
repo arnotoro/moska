@@ -38,9 +38,9 @@ class Card:
         self.suit = suit
         self.kopled = kopled
         self.trump_suit = trump_suit
-        self.is_public = False
+        self.is_public = True
         self.is_private = False
-        self.is_unknown = True
+        self.is_unknown = False
 
     def __hash__(self):
         return hash((self.value, self.suit))
@@ -173,8 +173,9 @@ class StandardDeck:
 
         if not self.cards or n <= 0:
             return []
-        
-        return [self.cards.popleft() for _ in range(min(len(self), n))]
+
+        hand = [self.cards.popleft() for _ in range(min(len(self), n))]
+        return hand
     
     def place_bottom(self, card):
         "Place a card at the bottom of the deck."

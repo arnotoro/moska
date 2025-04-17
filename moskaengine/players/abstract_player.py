@@ -34,7 +34,6 @@ class AbstractPlayer(ABC):
     
     def make_cards_known(self, game_state):
         """Make the cards in the hand known to the player"""
-        print(self.hand)
         for card in self.hand:
 
             # All cards must be unknown

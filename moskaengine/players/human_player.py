@@ -71,7 +71,7 @@ class Human(AbstractPlayer):
         if action_type == 'Attack':
             while True:
                 # Get the input from user
-                move_input = input(f"Enter the card(s) for {action_type} as tuples separated by space. [♣♠♥♦] (1 - 4, 2 - 14): ")
+                move_input = input(f"Enter the card(s) indexes for {action_type} as numbers separated by space (1-{len(self.hand)}): ")
 
                 # Parse the input
                 try:
@@ -79,7 +79,7 @@ class Human(AbstractPlayer):
                     selected = []
 
                     for card in move:
-                        suit, value = card.split(',')
+                        suit, value = self.hand[int(card)-1].suit, self.hand[int(card)-1].value
                         selected.append((int(suit), int(value)))
 
                     # Validate cards
@@ -90,7 +90,7 @@ class Human(AbstractPlayer):
                             if len(set(values)) == 1:
                                 return action_type, selected
                             else:
-                                print("Error: When playing multiple cards, all must have the same value.")
+                                print("Error: When playing multiple cards, all must have the same value.\n")
                                 continue
                         else:
                             return action_type, selected[0]
@@ -100,29 +100,112 @@ class Human(AbstractPlayer):
                         valid_cards = " ".join(f"{c[0]},{c[1]}" for c in choices)
                         print(f"Valid cards are: {valid_cards}")
                 except (ValueError, IndexError, SyntaxError, NameError):
+                    print("Input error. Please enter the indexes of the cards you want to play as numbers separated by spaces.\n")
+
+        elif action_type == 'Defend':
+            while True:
+                # Get the input from user
+                move_input = input(f"Enter the card pair(s) indexes for {action_type} as tuples separated by space. (played_card,card_on_table): ")
+
+                # Parse the input
+                try:
+                    move = move_input.split()
+                    played_cards = []
+                    cards_killed = []
+
+                    for player_input in move:
+                        played_card_idx, card_to_kill_idx = player_input.split(',')
+                        played_card = self.hand[int(played_card_idx)-1]
+                        card_to_kill = game_state.cards_to_defend[int(card_to_kill_idx)-1]
+
+                        played_cards.append(played_card)
+                        cards_killed.append(card_to_kill)
+
+                        print("Played cards:", played_cards, "and killed cards:", cards_killed)
+                    print(choices[:], "and you chose", played_cards)
+
+                    # Validate cards
+                    valid_cards = [choice[1] for choice in choices]
+                    if all(card in valid_cards for card in played_cards):
+                        return action_type, (played_cards, cards_killed)
+                    else:
+                        invalid_cards = [card for card in played_cards if card not in valid_cards]
+                        print(f"Invalid card(s): {invalid_cards}")
+                        valid_cards = " ".join(f"{c[1]} ({c[1].suit, c[1].value}),{c[0]} ({c[0].suit, c[0].value})" for c in choices)
+                        print(f"Valid cards are: {valid_cards}")
+
+                #     if all(card in choices for card in played_cards):
+                #
+                #         if len(played_cards) > 1:
+                #             values = [card[1] for card in selected]
+                #             if len(set(values)) == 1:
+                #                 return action_type, selected
+                #             else:
+                #                 print("Error: When playing multiple cards, all must have the same value.\n")
+                #                 continue
+                #         else:
+                #             return action_type, selected[0]
+                #     else:
+                #         invalid_cards = [card for card in selected if card not in choices]
+                #         print(f"Invalid card(s): {invalid_cards}")
+                #         valid_cards = " ".join(f"{c[0]},{c[1]}" for c in choices)
+                #         print(f"Valid cards are: {valid_cards}")
+                except (ValueError, IndexError, SyntaxError, NameError):
                     print("Invalid format. Please enter cards as 'suit,value' separated by spaces.")
 
-        elif action_type in ['Defend', 'Reflect', 'ReflectTrump']:
-            while True:
-                suit = int(input(f'Suit of the {action_type} card [♣♠♥♦] (1 - 4): '))
-                value = int(input(f'Value of the {action_type} card [23456789*JQKA] (2 - 14): '))
-                # print("Choices are", choices, "and you chose", (suit, value))
-
-                if (suit, value) in choices:
-                    break
-
-                # Fixed error message formatting
-                valid_cards = " ".join(f"{c[0]}{c[1]}" for c in choices)
-                print(f'Not valid, try again, the choices are [{valid_cards}]')
-
-            return action_type, (suit, value)
-
         elif action_type == 'PlayFromDeck':
-            action_data = [action for action in allowed_actions if action[0] == 'PlayFromDeck']
-            playable_flag = action_data[0][3]
-            print(f'Play from deck: {action_data, playable_flag}')
+            to_defend = []
+            deck_card = None
+            can_play = None
 
-            return action_type, playable_flag
+            print("Choices are", choices, "allowed actions are", allowed_actions)
+
+            for choice in choices:
+                # This means that the card is not playable on any card on the table
+                if choice is None:
+                    continue
+                deck_card = choice[1]
+                to_defend.append(choice[0])
+
+            # Check if the drawn card can be used to fall a card on the table
+            for action in allowed_actions:
+                if action[0] == 'PlayFromDeck':
+                    if action[3]:
+                        can_play = True
+                        break
+                    else:
+                        can_play = False
+
+            while True:
+                print("Card drawn from deck is", repr(deck_card))
+                assert can_play is not None
+
+                # Check if the drawn card can be used to fall a card on the table
+                if not can_play:
+                    print("The drawn card can't be used to fall a card on the table.")
+
+                # If there is only one card on the table to fall, try to fall it
+                if len(to_defend) == 1:
+                    return action_type, (deck_card, to_defend[0]), can_play
+
+                move_input = input(f"Enter the card you want to kill with the drawn card as a tuple [♣♠♥♦] 1 - 4, 2 - 14: ")
+
+                # Parse the input
+                try:
+                    suit, value = move_input.split(',')
+
+                    for card in to_defend:
+                        if card.suit == int(suit) and card.value == int(value):
+                            print(action_type, (deck_card, card), can_play)
+
+                            return action_type, (deck_card, card), can_play
+
+                    # Fixed error message formatting
+                    valid_cards = " ".join(f"{c[0]}{c[1]}" for c in choices)
+                    print(f'Not valid, try again, the choices are [{valid_cards}]')
+
+                except (ValueError, IndexError, SyntaxError, NameError):
+                    print("Invalid format. Please enter cards as 'suit,value' separated by spaces.\n")
 
 
         elif action_type in ['Take', 'PassAttack']:
