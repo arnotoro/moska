@@ -54,7 +54,7 @@ class AbstractPlayer(ABC):
             if card.is_unknown:
                 possible.update(non_public_cards)
             else:
-                possible.add((card.suit, card.value))
+                possible.add(card)
 
         return possible
     

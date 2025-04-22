@@ -6,19 +6,34 @@ from moskaengine.game.deck import suit_to_symbol
 def choose_random(lst, weights=None):
     """Choose a random element"""
     if weights is None:
+        print(f"choose_random: {lst}")
         return random.choice(list(lst))
     else:
+        print(f"choose_random: {lst} with weights {weights}")
         return random.choices(list(lst))[0]
 
 def choose_random_action(poss_actions):
     """Returns a random action from poss_actions with and without weights"""
     # Check if we used weights
-    if len(poss_actions[0]) == 3:
+    # TODO: This doesn't work for PlayFromDeck turn atm
+    print(f"choose_random_action: {poss_actions}, {len(poss_actions)}")
+    print(f"choose_random_action_list: {list(map(lambda x: (x[0], x[1]), poss_actions))}")
+
+    if len(poss_actions[0]) >= 3:
         # Weights are used
-        return choose_random(
-                list(map(lambda x: (x[0], x[1]), poss_actions)),
+
+        if any(len(action) == 4 for action in poss_actions):
+            print("hehe")
+            # Weights are used
+            return choose_random(
+                list(map(lambda x: (x[0], x[1], x[3]), poss_actions)),
                 weights = list(map(lambda x: x[2], poss_actions))
             )
+        else:
+            return choose_random(
+                    list(map(lambda x: (x[0], x[1]), poss_actions)),
+                    weights = list(map(lambda x: x[2], poss_actions))
+                )
     else:
         # Weights are not used
         return choose_random(poss_actions)

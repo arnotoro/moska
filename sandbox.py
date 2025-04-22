@@ -7,14 +7,15 @@ siemen = 618027
 print(siemen)
 random.seed(siemen)
 
+random.seed(random.randint(0, 1000000))
+
 
 # print(siemen)
 
 # Note the main attacker should be specified
 # The players can be one of ISMCTS, ISMCTSFPV, DeterminizedMCTS, Random, Human
-players = [Human('Player1'), Human('Player2')]
-
-# players = [Random('Random1'), Random('Random2')]
+# players = [Human('Player1'), Human('Player2')]
+players = [Random('Player1'), Random('Player2')]
 
 # If the computer must shuffle the deck of cards instead the player in real-life
 # computer_shuffle = False

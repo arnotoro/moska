@@ -51,6 +51,10 @@ class Card:
         else:
             return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
 
+    def __len__(self):
+        # TODO: This is a bit of a hack, but it works for now
+        return 1
+
     def __eq__(self, other):
         return self.suit == other.suit and self.value == other.value
 

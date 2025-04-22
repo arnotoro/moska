@@ -13,8 +13,8 @@ def run_simulation(seed):
     return str(game.loser).replace('Player ', '')
 
 if __name__ == '__main__':
-    total_games = 100_000
-    print_every = 10000
+    total_games = 100
+    print_every = 10
     start_time = time.time()
 
     losses = {name: 0 for name in ['Random1', 'Random2', 'Random3', 'Random4']}  # or however many players

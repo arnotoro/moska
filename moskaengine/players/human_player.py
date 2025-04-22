@@ -40,32 +40,57 @@ class Human(AbstractPlayer):
         # print([(i[0], i[1]) for i in allowed_actions])
         print(f'What does {self} do?')
 
-        if len(action_types) > 1:
-            action_types = sorted(action_types)
+        action_types = sorted(action_types)
 
-            # Ask the user to choose an action
-            while True:
-                try:
-                    # Subtract 1 from the input to get the correct index
+        # Ask the user to choose an action
+        while True:
+            try:
+                # Subtract 1 from the input to get the correct index
+                if len(action_types) > 1:
                     idx = int(input(f'Choose action (1 - {len(action_types)}): ')) - 1
-                    # Check if the index is valid
-                    if idx in range(0, len(action_types)):
-                        break
-                    else:
-                        print(f'Index not valid, try again.\n')
-                        print(basic_repr_player_actions(action_types, self))
-                except (ValueError, SyntaxError, NameError):
-                    print(f'Not a number, try again.\n')
-                    print(basic_repr_player_actions(action_types, self))
+                else:
+                    idx = int(input(f'Choose action ({len(action_types)}): ')) - 1
 
-            action_type = action_types[idx]
-        else:
-            # If there is only one action type, take it by default
-            action_type = list(action_types)[0]
+                # Check if the index is valid
+                if idx in range(0, len(action_types)):
+                    break
+                else:
+                    print(f'Index not valid, try again.\n')
+                    print(basic_repr_player_actions(action_types, self))
+            except (ValueError, SyntaxError, NameError):
+                print(f'Not a number, try again.\n')
+                print(basic_repr_player_actions(action_types, self))
+
+        action_type = action_types[idx]
+
+        # if len(action_types) > 1:
+        #     action_types = sorted(action_types)
+        #
+        #     # Ask the user to choose an action
+        #     while True:
+        #         try:
+        #             # Subtract 1 from the input to get the correct index
+        #             idx = int(input(f'Choose action (1 - {len(action_types)}): ')) - 1
+        #             # Check if the index is valid
+        #             if idx in range(0, len(action_types)):
+        #                 break
+        #             else:
+        #                 print(f'Index not valid, try again.\n')
+        #                 print(basic_repr_player_actions(action_types, self))
+        #         except (ValueError, SyntaxError, NameError):
+        #             print(f'Not a number, try again.\n')
+        #             print(basic_repr_player_actions(action_types, self))
+        #
+        #     action_type = action_types[idx]
+        # else:
+        #     # If there is only one action type, take it by default
+        #     action_type = list(action_types)[0]
 
         choices = [i[1] for i in allowed_actions if i[0] == action_type]
 
-        if len(choices) == 1 and action_type != 'PlayFromDeck':
+        # Check if the action type is 'ThrowCards' and there is only one choice i.e. no card to throw
+        # NOTE: Very unintuitive...
+        if len(choices) == 1 and action_type == 'ThrowCards':
             return action_type, choices[0]
 
         if action_type == 'Attack':
@@ -79,14 +104,13 @@ class Human(AbstractPlayer):
                     selected = []
 
                     for card in move:
-                        suit, value = self.hand[int(card)-1].suit, self.hand[int(card)-1].value
-                        selected.append((int(suit), int(value)))
+                        selected.append(self.hand[int(card)-1])
 
+                    print(selected, choices)
                     # Validate cards
                     if all(card in choices for card in selected):
-
                         if len(selected) > 1:
-                            values = [card[1] for card in selected]
+                            values = [card.value for card in selected]
                             if len(set(values)) == 1:
                                 return action_type, selected
                             else:
@@ -121,35 +145,18 @@ class Human(AbstractPlayer):
                         played_cards.append(played_card)
                         cards_killed.append(card_to_kill)
 
-                        print("Played cards:", played_cards, "and killed cards:", cards_killed)
-                    print(choices[:], "and you chose", played_cards)
-
                     # Validate cards
                     valid_cards = [choice[1] for choice in choices]
                     if all(card in valid_cards for card in played_cards):
-                        return action_type, (played_cards, cards_killed)
+                        if len(played_cards) > 1:
+                            return action_type, played_cards, cards_killed
+                        else:
+                            return action_type, (played_cards[0], cards_killed[0])
                     else:
                         invalid_cards = [card for card in played_cards if card not in valid_cards]
                         print(f"Invalid card(s): {invalid_cards}")
-                        valid_cards = " ".join(f"{c[1]} ({c[1].suit, c[1].value}),{c[0]} ({c[0].suit, c[0].value})" for c in choices)
-                        print(f"Valid cards are: {valid_cards}")
-
-                #     if all(card in choices for card in played_cards):
-                #
-                #         if len(played_cards) > 1:
-                #             values = [card[1] for card in selected]
-                #             if len(set(values)) == 1:
-                #                 return action_type, selected
-                #             else:
-                #                 print("Error: When playing multiple cards, all must have the same value.\n")
-                #                 continue
-                #         else:
-                #             return action_type, selected[0]
-                #     else:
-                #         invalid_cards = [card for card in selected if card not in choices]
-                #         print(f"Invalid card(s): {invalid_cards}")
-                #         valid_cards = " ".join(f"{c[0]},{c[1]}" for c in choices)
-                #         print(f"Valid cards are: {valid_cards}")
+                        valid_cards = " ".join(f"{c[1]}" for c in choices)
+                        print(f"Valid cards to play are: {valid_cards}")
                 except (ValueError, IndexError, SyntaxError, NameError):
                     print("Invalid format. Please enter cards as 'suit,value' separated by spaces.")
 
@@ -183,19 +190,33 @@ class Human(AbstractPlayer):
                 # Check if the drawn card can be used to fall a card on the table
                 if not can_play:
                     print("The drawn card can't be used to fall a card on the table.")
+                    return action_type, (deck_card, None), can_play
 
                 # If there is only one card on the table to fall, try to fall it
                 if len(to_defend) == 1:
                     return action_type, (deck_card, to_defend[0]), can_play
 
-                move_input = input(f"Enter the card you want to kill with the drawn card as a tuple [♣♠♥♦] 1 - 4, 2 - 14: ")
+                # TODO: If a card is playable only on one card, do not print all actions to ask.
+                n = 1
+                for i in to_defend:
+                    if i is None:
+                        continue
+                    print(f"{n}. {repr(i)}")
+                    n += 1
+
+                print(to_defend, choices)
+                print()
+                move_input = input(f"Enter the index of the card you want to kill with the drawn card: ")
 
                 # Parse the input
                 try:
-                    suit, value = move_input.split(',')
+                    move = move_input.split()
+
+                    selected_card = to_defend[int(move[0])-1]
+                    print(selected_card)
 
                     for card in to_defend:
-                        if card.suit == int(suit) and card.value == int(value):
+                        if card.suit == selected_card.suit and card.value == selected_card.value:
                             print(action_type, (deck_card, card), can_play)
 
                             return action_type, (deck_card, card), can_play
@@ -205,16 +226,48 @@ class Human(AbstractPlayer):
                     print(f'Not valid, try again, the choices are [{valid_cards}]')
 
                 except (ValueError, IndexError, SyntaxError, NameError):
-                    print("Invalid format. Please enter cards as 'suit,value' separated by spaces.\n")
+                    print("Invalid input, please enter the index of the card you want to kill.\n")
 
 
-        elif action_type in ['Take', 'PassAttack']:
+        elif action_type in ['TakeAll', 'TakeDefend', 'PassAttack']:
             return action_type, None
 
         elif action_type == 'ThrowCards':
-            idx = eval(input(f'Choose throw from {choices}: '))
-            return action_type, choices[idx]
+            while True:
+                # Print the choices for the player
+                for i, choice in enumerate(choices):
+                    print(f"{i+1}. {repr(choice[0])}")
 
+                move_input = input(f"Enter the index of the card you want to throw to table (multiple seperated by space): ")
+
+                # Parse the input
+                try:
+                    move = move_input.split()
+                    selected = []
+
+                    for card in move:
+                        selected.append(choices[int(card)-1])
+
+                    # Validate cards
+                    if all(card in choices for card in selected):
+
+                        if len(selected) > 1:
+                            values = [card[1] for card in selected]
+                            if len(set(values)) == 1:
+                                return action_type, selected
+                            else:
+                                print("Error: When playing multiple cards, all must have the same value.\n")
+                                continue
+                        else:
+                            return action_type, selected[0]
+                    else:
+                        invalid_cards = [card for card in selected if card not in choices]
+                        print(f"Invalid card(s): {invalid_cards}")
+                        valid_cards = " ".join(f"{c[0]},{c[1]}" for c in choices)
+                        print(f"Valid cards are: {valid_cards}")
+                except (ValueError, IndexError, SyntaxError, NameError):
+                    print(
+                        "Input error. Please enter the indexes of the cards you want to play as numbers separated by spaces.\n")
         else:
             raise NotImplementedError
         raise NotImplementedError

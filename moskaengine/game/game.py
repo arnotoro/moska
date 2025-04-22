@@ -200,14 +200,14 @@ class MoskaGame:
 
                 # If no pass, we play cards with same values as those that are played to table
                 values_on_table = {card.value for pair in self.cards_killed for card in pair}
-                possible_plays = [card for card in possible_plays if card[1] in values_on_table]
+                possible_plays = [card for card in possible_plays if card.value in values_on_table]
 
             # Group cards by value
             cards_by_value = {}
-            for suit, value in possible_plays:
-                if value not in cards_by_value:
-                    cards_by_value[value] = []
-                cards_by_value[value].append((suit, value))
+            for card in possible_plays:
+                if card.value not in cards_by_value:
+                    cards_by_value[card.value] = []
+                cards_by_value[card.value].append(card)
 
             defender_hand_size = len(self.defender.hand)
             current_attack_count = len(self.cards_to_defend)
@@ -216,8 +216,8 @@ class MoskaGame:
             # Check if table has space to play new cards for the defender
             if max_additional_attacks > 0:
                 # Single card attacks
-                for suit, value in possible_plays:
-                    possible_actions.append(('Attack', (suit, value)))
+                for card in possible_plays:
+                    possible_actions.append(('Attack', card))
 
                 # A combination card attack
                 for value, cards in cards_by_value.items():
@@ -229,7 +229,6 @@ class MoskaGame:
                                 print(f"The allowed combinations: {combination}")
                                 if len(combination) <= max_additional_attacks:
                                     possible_actions.append(('Attack', combination))
-
 
         elif action == "Defend":
             # TODO: Implement the logic for the defender to Koplata from the deck and to play to self.
@@ -301,7 +300,7 @@ class MoskaGame:
 
 
         elif action == "ThrowCards":
-            # Essentially PlayToOther
+            # Used when there are cards still on the table, otherwise attack action is used.
 
             possible_throws = player.possible_card_plays(self.get_non_public_cards())
 
@@ -310,10 +309,10 @@ class MoskaGame:
 
             values_on_table.update({card.value for card in self.cards_to_defend})
 
-            possible_throws = {card for card in possible_throws if card[1] in values_on_table}
-
+            possible_throws = {card for card in possible_throws if card in values_on_table}
             available_throws = len(self.defender.hand) - len(self.cards_to_defend)
 
+            print(f"Possible throws: {possible_throws} and available throws: {available_throws}")
             # If 0 cards thrown
             possible_actions.append(('ThrowCards', (None, )))
 
@@ -347,16 +346,17 @@ class MoskaGame:
 
         if action[0] == 'Attack':
             # The attacking move i.e. the first play to an empty table
-            print(action[1], len(action[1]))
-            if isinstance(action[1], list):
-                # Multiple cards case
-                for suit, value in action[1]:
-                    card_played = self.player_to_play.discard_card(self, suit, value)
+            if len(action[1]) > 1:
+                for card in action[1]:
+                    card_played = self.player_to_play.discard_card(self, card.suit, card.value)
                     self.cards_to_defend.append(card_played)
             else:
-                suit, value = action[1]
-                card_played = self.player_to_play.discard_card(self, suit, value)
+                card = action[1]
+                card_played = self.player_to_play.discard_card(self, card.suit, card.value)
                 self.cards_to_defend.append(card_played)
+
+            # The attacking player draws card from the deck until their hand full after attacking
+            self.player_to_play.fill_hand(self.deck)
 
             # Update values
             self.last_played_attacker = self.player_to_play
@@ -364,19 +364,32 @@ class MoskaGame:
             self.current_action = 'Defend'
 
         elif action[0] == 'Defend':
-            # TODO: Improve performance with sets?
+            # TODO: Improve performance with sets? Random player and Human player return different turn arguments
             # The defending move from the target player for the current turn
             cards_played = []
             cards_defended = []
 
-            for played_card in action[1][0]:
-                suit, value = played_card.suit, played_card.value
-                card_played = self.player_to_play.discard_card(self, suit, value)
-                cards_played.append(card_played)
+            print(action, action[1], len(action[1]))
 
-            for defended_card in action[1][1]:
-                self.cards_to_defend.remove(defended_card)
-                cards_defended.append(defended_card)
+            # Check if multiple cards are defended at the same time
+            if isinstance(action[1], tuple):
+                # Single case
+                played_card = self.player_to_play.discard_card(self, action[1][1].suit, action[1][1].value)
+                cards_played.append(played_card)
+                self.cards_to_defend.remove(action[1][0])
+                cards_defended.append(action[1][0])
+            elif isinstance(action[1], list):
+                # Multiple case
+                for played_card in action[1]:
+                    suit, value = played_card.suit, played_card.value
+                    card_played = self.player_to_play.discard_card(self, suit, value)
+                    cards_played.append(card_played)
+
+                for defended_card in action[2]:
+                    self.cards_to_defend.remove(defended_card)
+                    cards_defended.append(defended_card)
+            else:
+                raise ValueError(f"Action[1] is not a tuple or list: {action[1]}")
 
             for i in range(len(cards_defended)):
                 if i < len(cards_played):
@@ -398,6 +411,8 @@ class MoskaGame:
             print("Card drawn from deck is", repr(kopled_card), "and action is", action)
 
             # If this is False, the card can't fall a card on the table, and therefore it is added to the cards_to_defend
+
+            # TODO: Crashes here sometimes :D
             if not action[2]:
                 self.cards_to_defend.append(kopled_card)
 
@@ -434,6 +449,7 @@ class MoskaGame:
 
         elif action[0] == 'ThrowCards':
             # PlayToOther i.e. play to table for the defender to fall
+            print(f"Action from ThrowCards: {action, action[1][0]}")
             if action[1][0] is not None:
 
                 cards_to_throw = action[1]
@@ -442,9 +458,14 @@ class MoskaGame:
                     card_played = self.player_to_play.discard_card(self, suit, value)
                     self.cards_to_defend.append(card_played)
 
-            # Increment attacker and player to play
-            self.current_attacker = (self.current_attacker + 1) % len(self.attackers)
-            self.player_to_play = self.attackers[self.current_attacker]
+                # Give the defender a new chance if cards changed
+                self.last_played_attacker = self.player_to_play
+                self.player_to_play = self.defender
+                self.current_action = 'Defend'
+            else:
+                # Increment attacker and player to play
+                self.current_attacker = (self.current_attacker + 1) % len(self.attackers)
+                self.player_to_play = self.attackers[self.current_attacker]
 
 
             # Check if everybody got a chance to throw
@@ -599,27 +620,21 @@ class MoskaGame:
 
         # Choose an action
         action = self.player_to_play.choose_action(self)
+        print(f"Action chosen: {action}")
 
         # Display the action
+        # TODO: This is not working correctly at the moment, check defend printing
         if self.print_info or not self.computer_shuffle:
-            if action[0] == 'Attack':
+            if action[0] in ['Attack', 'Defend']:
                 # Check if action[1] is a list of tuples (multiple cards) or a single tuple
-                if isinstance(action[1], list):
-                    # Multiple cards case
-                    card_strings = []
-                    for card in action[1]:
-                        card_str = "X♣♠♥♦"[card[0]] + "0123456789*JQKA"[card[1]]
-                        card_strings.append(card_str)
-                    cards_display = ", ".join(card_strings)
-                    print(f'Action {action[0]} with cards {cards_display} was chosen by {self.player_to_play}')
+                if len(action[1]) > 1:
+                    print(f"{self.player_to_play} plays {action[0]} with cards {action[1]} ")
                 else:
-                    # Single card case
-                    card_str = "X♣♠♥♦"[action[1][0]] + "0123456789*JQKA"[action[1][1]]
-                    print(f'Action {action[0]} with card {card_str} was chosen by {self.player_to_play}')
+                    print(f"{self.player_to_play} plays {action[0]} with card {action[1]}")
             elif action[0] == 'Defend':
                 # TODO: Refactor cards printing to use tuples or CARD classes instead of strings
                 print(action, len(action[1]))
-                for i in range(0, len(action[1][1])):
+                for i in enumerate(action[1][0]):
                     print(f"{self.player_to_play} defends card {action[1][0][i]} with {action[1][1][i]}.")
 
                 # print(
