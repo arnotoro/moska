@@ -95,7 +95,10 @@ class Human(AbstractPlayer):
 
         if action_type == 'Attack':
             while True:
-                # Get the input from user
+                if any(isinstance(choice, tuple) for choice in choices):
+                    print(f"Allowed attack combinations are: {choices}")
+
+                # Get the input from the player
                 move_input = input(f"Enter the card(s) indexes for {action_type} as numbers separated by space (1-{len(self.hand)}): ")
 
                 # Parse the input
@@ -164,8 +167,6 @@ class Human(AbstractPlayer):
             to_defend = []
             deck_card = None
             can_play = None
-
-            print("Choices are", choices, "allowed actions are", allowed_actions)
 
             for choice in choices:
                 # This means that the card is not playable on any card on the table
@@ -270,4 +271,3 @@ class Human(AbstractPlayer):
                         "Input error. Please enter the indexes of the cards you want to play as numbers separated by spaces.\n")
         else:
             raise NotImplementedError
-        raise NotImplementedError

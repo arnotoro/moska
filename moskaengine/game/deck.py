@@ -38,9 +38,9 @@ class Card:
         self.suit = suit
         self.kopled = kopled
         self.trump_suit = trump_suit
-        self.is_public = True
+        self.is_public = False
         self.is_private = False
-        self.is_unknown = False
+        self.is_unknown = True
 
     def __hash__(self):
         return hash((self.value, self.suit))

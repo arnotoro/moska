@@ -15,7 +15,5 @@ class RandomPlayer(AbstractPlayer):
         # Get the allowed actions
         allowed_actions = game_state.allowed_plays()
 
-        print(basic_repr_game(game_state))
         random_action = choose_random_action(allowed_actions)
-        print(f"Random action: {random_action}")
         return random_action

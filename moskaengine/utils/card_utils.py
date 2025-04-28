@@ -6,38 +6,29 @@ from moskaengine.game.deck import suit_to_symbol
 def choose_random(lst, weights=None):
     """Choose a random element"""
     if weights is None:
-        print(f"choose_random: {lst}")
         return random.choice(list(lst))
     else:
-        print(f"choose_random: {lst} with weights {weights}")
         return random.choices(list(lst))[0]
 
 def choose_random_action(poss_actions):
     """Returns a random action from poss_actions with and without weights"""
     # Check if we used weights
-    # TODO: This doesn't work for PlayFromDeck turn atm
-    print(f"choose_random_action: {poss_actions}, {len(poss_actions)}")
-    print(f"choose_random_action_list: {list(map(lambda x: (x[0], x[1]), poss_actions))}")
-
     if len(poss_actions[0]) >= 3:
-        # Weights are used
+        # Get weights
+        weights = list(map(lambda x: x[2], poss_actions))
 
-        if any(len(action) == 4 for action in poss_actions):
-            print("hehe")
-            # Weights are used
-            return choose_random(
-                list(map(lambda x: (x[0], x[1], x[3]), poss_actions)),
-                weights = list(map(lambda x: x[2], poss_actions))
-            )
-        else:
-            return choose_random(
-                    list(map(lambda x: (x[0], x[1]), poss_actions)),
-                    weights = list(map(lambda x: x[2], poss_actions))
-                )
+        actions = []
+        for action in poss_actions:
+            if len(action) == 4:
+                actions.append((action[0], action[1], action[3]))
+            else:
+                actions.append((action[0], action[1]))
+        chosen_action = choose_random(actions, weights)
+        return chosen_action
     else:
+        # NOTE: Might not work right now
         # Weights are not used
         return choose_random(poss_actions)
-
 
 def basic_repr_game(game_state):
     """Returns a basic representation of the game state"""
@@ -47,7 +38,21 @@ def basic_repr_game(game_state):
     for pl in game_state.players:
         string += f"{pl.name}{' (TG)' if pl is game_state.defender else ''}"
         string += " " * max(16 - len(string.split("\n")[-1]), 1)
-        string += f" : {pl.hand}\n"
+        if pl == game_state.player_to_play:
+            string += f" : {pl.hand}\n"
+
+        else:
+            # TODO: Change the logic to be handled elsewhere
+            # Filter and display public and non-public cards
+            formatted_hand = []
+            for card in pl.hand:
+                if card.is_public:
+                    formatted_hand.append(str(card))  # Use the card's string representation
+                else:
+                    formatted_hand.append("-X")  # Placeholder for non-public cards
+
+            hand_str = "[" + ", ".join(formatted_hand) + "]" if formatted_hand else "[]"
+            string += f" : {hand_str}\n"
 
     string += f"Cards to defend : {game_state.cards_to_defend}\n"
     string += f"Killed cards : {game_state.cards_killed}\n"
