@@ -143,7 +143,7 @@ class StandardDeck:
     seed_value : int = None
     cards : deque = None
 
-    def __init__(self, shuffle = True, seed_value = None):
+    def __init__(self, shuffle = True, seed_value = None, perfect_info = False):
         self.seed_value = seed_value if seed_value else randint(0, 100_000_000)
         seed(self.seed_value)
         self.cards = deque(
@@ -153,6 +153,11 @@ class StandardDeck:
         )
         if shuffle:
             self.shuffle()
+        if perfect_info:
+            for card in self.cards:
+                card.is_unknown = False
+                card.is_private = False
+                card.is_public = True
 
     def __len__(self):
         return len(self.cards)
@@ -174,11 +179,19 @@ class StandardDeck:
 
     def pop(self, n):
         "Pop (draw) n cards from the top of the deck."
-
+        hand = []
         if not self.cards or n <= 0:
             return []
 
-        hand = [self.cards.popleft() for _ in range(min(len(self), n))]
+        for _ in range(min(len(self), n)):
+            card = self.cards.popleft()
+            # Make cards known to the player
+            card.is_unknown = False
+            card.is_private = True
+            card.is_public = False
+            hand.append(card)
+
+        # hand = [self.cards.popleft() for _ in range(min(len(self), n))]
         return hand
     
     def place_bottom(self, card):

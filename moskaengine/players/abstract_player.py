@@ -8,7 +8,6 @@ class AbstractPlayer(ABC):
     def __init__(self, name):
         self.name = name
         self.hand = []
-
     
     def __str__(self):
         return f"{self.name}"
@@ -61,7 +60,7 @@ class AbstractPlayer(ABC):
     def discard_card(self, game_state, suit, value, remove = True):
         """Discard a card from the hand with the given suit and value"""
         # TODO: Comment this
-        for id, card in enumerate(self.hand):
+        for idx, card in enumerate(self.hand):
             if card.is_unknown:
                 if (suit, value) in game_state.get_non_public_cards():
                     if (suit, value) not in [(c.suit, c.value) for c in self.hand if not c.is_unknown]:
@@ -75,9 +74,9 @@ class AbstractPlayer(ABC):
             raise BaseException('Card not possible to discard')
         
         if remove:
-            card_played = self.hand.pop(id)
+            card_played = self.hand.pop(idx)
         else:
-            card_played = self.hand[id]
+            card_played = self.hand[idx]
 
         card_played.is_unknown = False
         card_played.is_private = False

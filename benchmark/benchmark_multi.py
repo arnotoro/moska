@@ -7,14 +7,14 @@ from multiprocessing import Pool, cpu_count
 def run_simulation(seed):
     players = [Random('Random1'), Random('Random2'), Random('Random3'), Random('Random4')]
     computer_shuffle = True
-    game = MoskaGame(players, computer_shuffle, main_attacker=random.choice(['Random1', 'Random2', 'Random3', 'Random4']), print_info=False)
+    game = MoskaGame(players, computer_shuffle, main_attacker=random.choice(['Random1', 'Random2', 'Random3', 'Random4']), print_info=False, save_vectors=False)
     while not game.is_end_state:
         game.next()
     return str(game.loser).replace('Player ', '')
 
 if __name__ == '__main__':
-    total_games = 100
-    print_every = 10
+    total_games = 10000
+    print_every = 1000
     start_time = time.time()
 
     losses = {name: 0 for name in ['Random1', 'Random2', 'Random3', 'Random4']}  # or however many players

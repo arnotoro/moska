@@ -16,7 +16,6 @@ def choose_random_action(poss_actions):
     if len(poss_actions[0]) >= 3:
         # Get weights
         weights = list(map(lambda x: x[2], poss_actions))
-
         actions = []
         for action in poss_actions:
             if len(action) == 4:
@@ -38,21 +37,23 @@ def basic_repr_game(game_state):
     for pl in game_state.players:
         string += f"{pl.name}{' (TG)' if pl is game_state.defender else ''}"
         string += " " * max(16 - len(string.split("\n")[-1]), 1)
-        if pl == game_state.player_to_play:
+        if game_state.perfect_info:
             string += f" : {pl.hand}\n"
-
         else:
-            # TODO: Change the logic to be handled elsewhere
-            # Filter and display public and non-public cards
-            formatted_hand = []
-            for card in pl.hand:
-                if card.is_public:
-                    formatted_hand.append(str(card))  # Use the card's string representation
-                else:
-                    formatted_hand.append("-X")  # Placeholder for non-public cards
+            if pl == game_state.player_to_play:
+                string += f" : {pl.hand}\n"
+            else:
+                # TODO: Change the logic to be handled elsewhere
+                # Filter and display public and non-public cards
+                formatted_hand = []
+                for card in pl.hand:
+                    if card.is_public:
+                        formatted_hand.append(str(card))  # Use the card's string representation
+                    else:
+                        formatted_hand.append("-X")  # Placeholder for non-public cards
 
-            hand_str = "[" + ", ".join(formatted_hand) + "]" if formatted_hand else "[]"
-            string += f" : {hand_str}\n"
+                hand_str = "[" + ", ".join(formatted_hand) + "]" if formatted_hand else "[]"
+                string += f" : {hand_str}\n"
 
     string += f"Cards to defend : {game_state.cards_to_defend}\n"
     string += f"Killed cards : {game_state.cards_killed}\n"

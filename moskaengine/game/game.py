@@ -7,6 +7,9 @@ from itertools import combinations
 import random
 from collections import defaultdict
 
+from moskaengine.utils.game_utils import state_as_vector, save_game_vector
+
+
 class MoskaGame:
     """
     The class for representing a game of Moska.
@@ -25,7 +28,20 @@ class MoskaGame:
     print_info = True
     trump_card = None  # The trump card
 
-    def __init__(self, players, computer_shuffle, main_attacker = None, do_init = True, print_info = True, perfect_info = False):
+    # Number of turns to keep track of for vector representation
+    N_HISTORY = 5
+
+    def __init__(self,
+                 players,
+                 computer_shuffle,
+                 main_attacker = None,
+                 do_init = True,
+                 print_info = True,
+                 perfect_info = False,
+                 save_vectors = False,
+                 state_folder = "game_vectors",
+                 file_format = "csv",
+                 ):
 
         if not do_init:
             return
@@ -34,27 +50,41 @@ class MoskaGame:
         self.computer_shuffle = computer_shuffle
         self.print_info = print_info
         self.perfect_info = perfect_info
+        self.n_turns = 0
 
-        # Initialize the player variants
+        # Initialize the player variables
         self.attackers = None
         self.defender = None
         self.current_attacker = None
         self.draw_undefended = False
 
+        # Game variables
+        self.cards_killed = []
+        self.cards_to_defend = []
+
+        # Data saving
+        self.save_vectors = save_vectors
+        self.state_folder = state_folder
+        self.file_format = file_format
+        self.history = []
+        self.state_data = []
+        self.opponent_data = []
+
         # If the main attacker is not specified, choose randomly
-        self.main_attacker = random.choice(players).name if main_attacker is None else main_attacker
+        self.main_attacker = random.choice(players) if main_attacker is None else next(player for player in players if player.name == main_attacker)
+
+        # NOTE: Only initialized for the game state vector
+        self.player_to_play = self.main_attacker
 
         # Initialize the deck
-        self.deck = StandardDeck(shuffle=True)
-        # print(repr(self.deck))
+        self.deck = StandardDeck(shuffle=True, perfect_info=perfect_info)
 
         # Initialize
         self.all_cards = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
 
         self.card_collection = self.deck.copy()
 
-        # Keep track of actions played in the game
-        self.history = []
+        self.reference_deck = StandardDeck(shuffle=False, perfect_info=True)
 
         # Players draw their hand
         for player in self.players:
@@ -76,7 +106,9 @@ class MoskaGame:
                         player.hand.remove(card)
                         player.hand.append(self.trump_card)
                         self.deck.place_bottom(card)
-                        print(f"{player} has switched the trump card ({self.trump_card}) with their 2 of trump card ({card})")
+
+                        if self.print_info:
+                            print(f"{player} has switched the trump card ({self.trump_card}) with their 2 of trump card ({card})")
 
                         card.is_public = True
                         card.is_unknown = False
@@ -105,7 +137,16 @@ class MoskaGame:
 
 
         # Initialize the attacking player
-        print(f"Player to start: {self.main_attacker}")
+        if self.print_info:
+            print(f"Player to start: {self.main_attacker}")
+
+        # Game state vector for the initial game
+        if self.save_vectors:
+            state, opponent = state_as_vector(self)
+            self.state_data.append([state])
+            self.opponent_data.append([opponent])
+
+        # Start the game
         self.new_attack(self.main_attacker)
 
 
@@ -132,8 +173,9 @@ class MoskaGame:
 
         # Search for the main attacker
         active_players = len(self.players)
+
         for id, player in enumerate(self.players):
-            if player.name == main_attacker:
+            if player == main_attacker:
                 break
         else:
             raise BaseException("Starting player not found.")
@@ -170,14 +212,13 @@ class MoskaGame:
             # To check if all attackers passed
             self.last_played_attacker = None
 
-            # All the trumps that were used to reflect this turn (they lost their life)
-            self.reflected_trumps = []
-
         # The action to perform
         self.current_action = 'Attack'
         # Succesfully defended cards as (attack, defend) pairs
         self.cards_killed = []
         self.cards_to_defend = []
+
+        # TODO: Initialize game vector here
 
     def allowed_plays(self):
         """Allowed plays for the current attacker"""
@@ -237,10 +278,10 @@ class MoskaGame:
                     # Check if the card can defend the to_defend card
                     if card.suit == self.trump_card.suit and not to_defend.is_trump():
                         # Can always defend with trump on a non-trump card
-                        defend_options.append(('Defend', (to_defend, card)))
+                        defend_options.append(('Defend', (card, to_defend)))
                     elif card.suit == to_defend.suit and card.value > to_defend.value:
                         # Can always defend the same suit with higher value
-                        defend_options.append(('Defend', (to_defend, card)))
+                        defend_options.append(('Defend', (card, to_defend)))
 
                 # Add defense options for this card with appropriate weights
                 if defend_options:
@@ -260,14 +301,14 @@ class MoskaGame:
                 for defend_card in self.cards_to_defend:
                     # Check if the kopled card could fall a card on the table
                     if next_card.suit == defend_card.suit and next_card.value > defend_card.value:
-                        possible_actions.append(('PlayFromDeck', (defend_card, next_card), 1 / 2, True))
+                        possible_actions.append(('PlayFromDeck', (next_card, defend_card), 1 / 2, True))
                     elif next_card.suit == self.trump_card.suit and not defend_card.is_trump():
-                        possible_actions.append(('PlayFromDeck', (defend_card, next_card), 1 / 2, True))
+                        possible_actions.append(('PlayFromDeck', (next_card, defend_card), 1 / 2, True))
                     else:
                         # If the kopled card can't fall a card on the table, it must be added to the cards_to_defend
-                        possible_actions.append(('PlayFromDeck', (None, next_card), 1 / 2, False))
+                        possible_actions.append(('PlayFromDeck', (next_card, None), 1 / 2, False))
 
-            # You can also pick up only the cards on the table if there is defended cards
+            # You can also pick up only the cards on the table if there are defended cards
             if self.cards_killed:
                 possible_actions.append(('TakeDefend', None, 1 / (len(self.cards_to_defend)) + 2))
 
@@ -288,9 +329,8 @@ class MoskaGame:
             possible_throws = {card for card in possible_throws if card in values_on_table}
             available_throws = len(self.defender.hand) - len(self.cards_to_defend)
 
-            print(f"Possible throws: {possible_throws} and available throws: {available_throws}")
             # If 0 cards thrown
-            possible_actions.append(('ThrowCards', (None, )))
+            possible_actions.append(('ThrowCards', None))
 
             # If more than 0 cards thrown
             max_throws = min(available_throws, len(possible_throws), len(player.hand))
@@ -318,7 +358,9 @@ class MoskaGame:
 
     def execute_action(self, action):
         # Add to history
-        self.history.append(action)
+        self.history.append((action, self.player_to_play.name))
+
+        # TODO: Save current game state vector here before exuting the action
 
         if action[0] == 'Attack':
             # The attacking move i.e. the first play to an empty table
@@ -340,7 +382,7 @@ class MoskaGame:
             self.current_action = 'Defend'
 
         elif action[0] == 'Defend':
-            # TODO: Improve performance with sets? Random player and Human player return different turn arguments
+            # TODO: Improve performance with sets?
             # The defending move from the target player for the current turn
             cards_played = []
             cards_defended = []
@@ -350,10 +392,10 @@ class MoskaGame:
             # Check if multiple cards are defended at the same time
             if isinstance(action[1], tuple):
                 # Single case
-                played_card = self.player_to_play.discard_card(self, action[1][1].suit, action[1][1].value)
+                played_card = self.player_to_play.discard_card(self, action[1][0].suit, action[1][0].value)
                 cards_played.append(played_card)
-                self.cards_to_defend.remove(action[1][0])
-                cards_defended.append(action[1][0])
+                self.cards_to_defend.remove(action[1][1])
+                cards_defended.append(action[1][1])
             elif isinstance(action[1], list):
                 # Multiple case
                 for played_card in action[1]:
@@ -422,7 +464,8 @@ class MoskaGame:
 
         elif action[0] == 'ThrowCards':
             # PlayToOther i.e. play to table for the defender to fall
-            if action[1][0] is not None:
+
+            if action[1] is not None:
 
                 cards_to_throw = action[1]
 
@@ -456,7 +499,7 @@ class MoskaGame:
                     self.deck = player.fill_hand(self.deck)
 
                 # Defender takes the cards and the new main attacker is the one to the left of the defender
-                self.new_attack(self.attackers[1 % len(self.attackers)].name)
+                self.new_attack(self.attackers[1 % len(self.attackers)])
 
         elif action[0] == 'PassAttack':
             # Pass on attacking i.e. skip
@@ -472,10 +515,9 @@ class MoskaGame:
 
                 assert self.cards_to_defend == []
 
-                self.new_attack(self.defender.name)
+                self.new_attack(self.defender)
         else:
             raise NotImplementedError('Action to execute not implemented.')
-
 
     def make_deepcopy(self):
         """Returns a deepcopy of the MoskaGame, faster than deepcopy"""
@@ -530,16 +572,17 @@ class MoskaGame:
         new.cards_killed = [(card_ids[id(p[0])], card_ids[id(p[1])]) for p in self.cards_killed]
         return new
 
-
     def next(self):
         """Chooses and performs an action/move"""
         # Check if this node is terminal
         if self.is_end_state:
             raise BaseException('This was an end state')
 
-        # Print the current game state
-        # if self.print_info:
-            # print(basic_repr_game(self))
+        # Game state as a vector for each turn before the next action
+        if self.n_turns >= 1 and self.save_vectors:
+            state, opponent = state_as_vector(self)
+            self.state_data.append([state])
+            self.opponent_data.append([opponent])
 
         # Choose an action
         action = self.player_to_play.choose_action(self)
@@ -568,3 +611,8 @@ class MoskaGame:
 
         # Execute the action
         self.execute_action(action)
+        self.n_turns += 1
+
+        if self.is_end_state and self.save_vectors:
+            # Save the game vector
+            save_game_vector(self.state_data, self.opponent_data, self.state_folder, self.file_format)

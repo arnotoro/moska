@@ -32,12 +32,6 @@ class Human(AbstractPlayer):
         # Print the allowed actions
         print(basic_repr_player_actions(action_types, self))
 
-        # Print the allowed actions
-        # print()
-        # print([c for c in self.hand])
-        # print(f'Allowed actions for {self} are:')
-        # print([i[0] for i in allowed_actions])
-        # print([(i[0], i[1]) for i in allowed_actions])
         print(f'What does {self} do?')
 
         action_types = sorted(action_types)
@@ -63,29 +57,6 @@ class Human(AbstractPlayer):
 
         action_type = action_types[idx]
 
-        # if len(action_types) > 1:
-        #     action_types = sorted(action_types)
-        #
-        #     # Ask the user to choose an action
-        #     while True:
-        #         try:
-        #             # Subtract 1 from the input to get the correct index
-        #             idx = int(input(f'Choose action (1 - {len(action_types)}): ')) - 1
-        #             # Check if the index is valid
-        #             if idx in range(0, len(action_types)):
-        #                 break
-        #             else:
-        #                 print(f'Index not valid, try again.\n')
-        #                 print(basic_repr_player_actions(action_types, self))
-        #         except (ValueError, SyntaxError, NameError):
-        #             print(f'Not a number, try again.\n')
-        #             print(basic_repr_player_actions(action_types, self))
-        #
-        #     action_type = action_types[idx]
-        # else:
-        #     # If there is only one action type, take it by default
-        #     action_type = list(action_types)[0]
-
         choices = [i[1] for i in allowed_actions if i[0] == action_type]
 
         # Check if the action type is 'ThrowCards' and there is only one choice i.e. no card to throw
@@ -109,7 +80,6 @@ class Human(AbstractPlayer):
                     for card in move:
                         selected.append(self.hand[int(card)-1])
 
-                    print(selected, choices)
                     # Validate cards
                     if all(card in choices for card in selected):
                         if len(selected) > 1:
@@ -149,7 +119,7 @@ class Human(AbstractPlayer):
                         cards_killed.append(card_to_kill)
 
                     # Validate cards
-                    valid_cards = [choice[1] for choice in choices]
+                    valid_cards = [choice[0] for choice in choices]
                     if all(card in valid_cards for card in played_cards):
                         if len(played_cards) > 1:
                             return action_type, played_cards, cards_killed
@@ -205,7 +175,6 @@ class Human(AbstractPlayer):
                     print(f"{n}. {repr(i)}")
                     n += 1
 
-                print(to_defend, choices)
                 print()
                 move_input = input(f"Enter the index of the card you want to kill with the drawn card: ")
 
@@ -214,12 +183,9 @@ class Human(AbstractPlayer):
                     move = move_input.split()
 
                     selected_card = to_defend[int(move[0])-1]
-                    print(selected_card)
 
                     for card in to_defend:
                         if card.suit == selected_card.suit and card.value == selected_card.value:
-                            print(action_type, (deck_card, card), can_play)
-
                             return action_type, (deck_card, card), can_play
 
                     # Fixed error message formatting
