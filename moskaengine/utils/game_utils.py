@@ -16,7 +16,7 @@ def state_as_vector(game_state, file_format ="numpy"):
 
     return state_data, opponent_data
 
-def save_game_vector(state_data, opponent_data, folder = "game_vectors", file_format = "numpy"):
+def save_game_vector(state_data, opponent_data, folder = "game_vectors", file_format = "csv"):
     # Save the game to a Numpy file
     if file_format == "numpy":
         _save_game_vector_numpy(state_data, opponent_data, folder)
@@ -25,6 +25,22 @@ def save_game_vector(state_data, opponent_data, folder = "game_vectors", file_fo
     else:
         # Print the game state
         print(state_data, opponent_data)
+
+def save_game_state_vector_batch(state_data, batch_number, folder_name = "vectors"):
+    save_folder = os.path.join(f"../{folder_name}/states")
+    os.makedirs(save_folder, exist_ok=True)
+    file_name = os.path.join(save_folder, f"states_results_batch_{batch_number}_{uuid.uuid4()}.csv")
+    with open(file_name, "a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerows(state_data)
+
+def save_opponent_vector_batch(opponent_data, batch_number, folder_name = "vectors"):
+
+    os.makedirs(save_folder, exist_ok=True)
+    file_name = os.path.join(save_folder, f"opponent_results_batch_{batch_number}_{uuid.uuid4()}.csv")
+    with open(file_name, "a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerows(opponent_data)
 
 def _save_game_vector_numpy(state_data, opponent_data, folder_name = "game_data"):
     pass
@@ -42,19 +58,19 @@ def _save_game_vector_csv(state_data, opponent_data, folder_name = "game_data"):
     # With a random file name for state data
     file_name = f"state_data_{uuid.uuid4()}.csv"
     file_path = os.path.join(root_folder, parent_folder, "states", file_name)
-
+    # print(state_data)
     with open(file_path, "w", newline="") as file:
         writer = csv.writer(file)
-
         for turn in state_data:
-            writer.writerow(turn[0])
+            writer.writerow(turn)
 
+    file_name = f"opponent_data_{uuid.uuid4()}.csv"
     file_path = os.path.join(root_folder, parent_folder, "opponent", file_name)
     with open(file_path, "w", newline="") as file:
         writer = csv.writer(file)
 
         for turn in opponent_data:
-            writer.writerow(turn[0])
+            writer.writerow(turn)
 
 def _game_state_as_vector(game_state):
     """
@@ -128,7 +144,7 @@ def _game_state_as_vector(game_state):
 
 def _opponent_cards_as_vector(game_state):
     """Convert the opponent's cards to a vector representation. This is from the perspective of the current player.
-    Used as a label data for the model.
+    Used as label data for the model.
     """
     vector = []
     for idx, player in enumerate(game_state.players):
@@ -158,13 +174,10 @@ def _encode_cards(cards, fill = 0):
 
     return encoded_cards
 
-
 def _create_folders(root_folder, folder_name):
     """Create the folder `folder_name` in the root of the project and create the subfolders `states` and `opponent"""
     # Format the time as a string (e.g., 20250428_123456)
     timestamp = time.strftime("%Y%m%d_%H%M%S", time.gmtime())
-
-
     parent_folder = os.path.join(root_folder, f"{folder_name}")
     os.makedirs(os.path.join(parent_folder, f"states"), exist_ok=True)
     os.makedirs(os.path.join(parent_folder, "opponent"), exist_ok=True)

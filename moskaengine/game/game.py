@@ -36,11 +36,12 @@ class MoskaGame:
                  computer_shuffle,
                  main_attacker = None,
                  do_init = True,
-                 print_info = True,
+                 print_info = False,
                  perfect_info = False,
                  save_vectors = False,
                  state_folder = "game_vectors",
                  file_format = "csv",
+                 debug = False,
                  ):
 
         if not do_init:
@@ -51,6 +52,7 @@ class MoskaGame:
         self.print_info = print_info
         self.perfect_info = perfect_info
         self.n_turns = 0
+        self.debug = debug
 
         # Initialize the player variables
         self.attackers = None
@@ -124,9 +126,9 @@ class MoskaGame:
             self.deck[-1].from_input(self.all_cards)
             self.deck[-1].is_public = True
 
-        # TODO: This is a weird way to check trump
-        for card in self.deck.cards:
-            card.trump_suit = self.trump_card.suit
+        # # TODO: This is a weird way to check trump
+        # for card in self.deck.cards:
+        #     card.trump_suit = self.trump_card.suit
 
         # Initialize the players
         for player in self.players:
@@ -143,12 +145,11 @@ class MoskaGame:
         # Game state vector for the initial game
         if self.save_vectors:
             state, opponent = state_as_vector(self)
-            self.state_data.append([state])
-            self.opponent_data.append([opponent])
+            self.state_data.append(state)
+            self.opponent_data.append(opponent)
 
         # Start the game
         self.new_attack(self.main_attacker)
-
 
     def get_unknown_cards(self):
         """Returns the (suit, value) pairs of all unknown cards"""
@@ -359,8 +360,6 @@ class MoskaGame:
     def execute_action(self, action):
         # Add to history
         self.history.append((action, self.player_to_play.name))
-
-        # TODO: Save current game state vector here before exuting the action
 
         if action[0] == 'Attack':
             # The attacking move i.e. the first play to an empty table
@@ -581,8 +580,8 @@ class MoskaGame:
         # Game state as a vector for each turn before the next action
         if self.n_turns >= 1 and self.save_vectors:
             state, opponent = state_as_vector(self)
-            self.state_data.append([state])
-            self.opponent_data.append([opponent])
+            self.state_data.append(state)
+            self.opponent_data.append(opponent)
 
         # Choose an action
         action = self.player_to_play.choose_action(self)
@@ -615,4 +614,9 @@ class MoskaGame:
 
         if self.is_end_state and self.save_vectors:
             # Save the game vector
-            save_game_vector(self.state_data, self.opponent_data, self.state_folder, self.file_format)
+            if self.debug:
+                save_game_vector(self.state_data, self.opponent_data, self.state_folder, self.file_format)
+
+            return self.state_data, self.opponent_data
+
+        return None

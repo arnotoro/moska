@@ -21,9 +21,9 @@ players = [Random('Player1'), Random('Player2')]
 # computer_shuffle = False
 computer_shuffle = True
 
-game = MoskaGame(players, computer_shuffle, perfect_info=False)
+game = MoskaGame(players, computer_shuffle, perfect_info=False, save_vectors=True)
 while not game.is_end_state:
     game.next()
 
-print()
+print(game.state_data, game.opponent_data)
 print(f'Game is lost by {game.loser}')
