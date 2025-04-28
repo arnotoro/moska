@@ -3,7 +3,7 @@ from moskaengine.game.game import MoskaGame
 from moskaengine.players.human_player import Human
 from moskaengine.players.random_player import RandomPlayer as Random
 
-siemen = 303384
+siemen = random.randint(0, 1000000)
 print(f"Used seed: {siemen}")
 random.seed(siemen)
 
@@ -21,9 +21,9 @@ players = [Random('Player1'), Random('Player2')]
 # computer_shuffle = False
 computer_shuffle = True
 
-game = MoskaGame(players, computer_shuffle, perfect_info=False, save_vectors=True)
+game = MoskaGame(players, computer_shuffle, perfect_info=False, save_vectors=True, print_info=True)
 while not game.is_end_state:
     game.next()
 
-print(game.state_data, game.opponent_data)
+# print(game.state_data, game.opponent_data)
 print(f'Game is lost by {game.loser}')

@@ -128,7 +128,7 @@ class Human(AbstractPlayer):
                     else:
                         invalid_cards = [card for card in played_cards if card not in valid_cards]
                         print(f"Invalid card(s): {invalid_cards}")
-                        valid_cards = " ".join(f"{c[1]}" for c in choices)
+                        valid_cards = " ".join(f"{c[0]}" for c in choices)
                         print(f"Valid cards to play are: {valid_cards}")
                 except (ValueError, IndexError, SyntaxError, NameError):
                     print("Invalid format. Please enter cards as 'suit,value' separated by spaces.")

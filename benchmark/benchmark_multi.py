@@ -42,7 +42,7 @@ def writer(queue):
             opp_writer.writerows(opponent_data)
 
 if __name__ == '__main__':
-    total_games = 1000
+    total_games = 2000
     print_every = 100
     start_time = time.time()
 

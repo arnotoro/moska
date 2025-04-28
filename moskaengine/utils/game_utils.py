@@ -26,22 +26,6 @@ def save_game_vector(state_data, opponent_data, folder = "game_vectors", file_fo
         # Print the game state
         print(state_data, opponent_data)
 
-def save_game_state_vector_batch(state_data, batch_number, folder_name = "vectors"):
-    save_folder = os.path.join(f"../{folder_name}/states")
-    os.makedirs(save_folder, exist_ok=True)
-    file_name = os.path.join(save_folder, f"states_results_batch_{batch_number}_{uuid.uuid4()}.csv")
-    with open(file_name, "a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerows(state_data)
-
-def save_opponent_vector_batch(opponent_data, batch_number, folder_name = "vectors"):
-
-    os.makedirs(save_folder, exist_ok=True)
-    file_name = os.path.join(save_folder, f"opponent_results_batch_{batch_number}_{uuid.uuid4()}.csv")
-    with open(file_name, "a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerows(opponent_data)
-
 def _save_game_vector_numpy(state_data, opponent_data, folder_name = "game_data"):
     pass
 
@@ -78,7 +62,6 @@ def _game_state_as_vector(game_state):
     """
     vector = []
     killed_list = []
-    turn_history = []
     actions = {
         "Attack": 1,
         "Defend": 2,
@@ -90,55 +73,59 @@ def _game_state_as_vector(game_state):
     }
 
     # The cards left in the deck
-    vector += [len(game_state.deck.cards)]
+    # vector.append(len(game_state.deck.cards))
 
     # The cards on the table
-    vector += _encode_cards(game_state.cards_to_defend)
+    # vector.extend(_encode_cards(game_state.cards_to_defend))
 
     # The discarded cards i.e., not in the game anymore
-    for item in game_state.cards_killed:
-        killed_list.extend(item)
-    vector += _encode_cards(killed_list)
+    for item in game_state.cards_discarded:
+        killed_list.append(item)
+    # vector.extend(_encode_cards(killed_list))
 
     # The current player idx (1-4)
-    vector += [game_state.players.index(game_state.player_to_play) + 1]
+    # vector.append((game_state.players.index(game_state.player_to_play) + 1))
 
     # Current player's hand
-    vector += _encode_cards(game_state.player_to_play.hand)
+    # vector.extend(_encode_cards(game_state.player_to_play.hand))
 
     # Number of cards in each player's hand
-    for player in game_state.players:
-        vector += [len(player.hand)]
+    # vector.extend(len(player.hand) for player in game_state.players)
 
     # Turn number
-    vector += [game_state.n_turns]
+    # vector.append(game_state.n_turns)
 
     # Move history for the last N turns, default 5
-    turn_history = deque([[0, 0] + [0] * 52 for _ in range(game_state.N_HISTORY)], maxlen=game_state.N_HISTORY)
-    # For the first turn
-    cards = []
-    for idx, move in enumerate(game_state.history[-game_state.N_HISTORY:]):
-        # Action idx (check actions dict)
-        action = actions[move[0][0]]
-        # Player idx (1-4)
-        player = next(idx for idx, pl in enumerate(game_state.players) if pl.name == move[1]) + 1
-        # Played card by reference deck
-        if isinstance(move[0][1], tuple) or isinstance(move[0][1], list):
-            # If the cards in the history are given as a tuple e.g., for Defend or PlayFromDeck
-            if move[0][1][1] is None:
-                # Special case when PlayFromDeck can't be played on a card on the table
-                cards = _encode_cards([move[0][1][0]])
+    player_indices = {pl.name: idx + 1 for idx, pl in enumerate(game_state.players)}
+
+    history_len = 2 + 52
+    turn_history = deque([[0] * history_len for _ in range(game_state.N_HISTORY)], maxlen=game_state.N_HISTORY)
+
+    # The last N turns
+    for move in game_state.history[-game_state.N_HISTORY:]:
+        move_type, move_player = move[0][0], move[1]
+        move_cards = move[0][1]
+
+        action_idx = actions.get(move_type, 0)
+        player_idx = player_indices.get(move_player, 0)
+
+        if isinstance(move_cards, (tuple, list)):
+            if move_cards[1] is None:
+                cards_vec = _encode_cards([move_cards[0]])
             else:
-                cards = _encode_cards([move[0][1][0], move[0][1][1]])
-        elif move[0][1] is None:
-            pass
+                cards_vec = _encode_cards([move_cards[0], move_cards[1]])
+        elif move_cards is None:
+            cards_vec = [0] * 52
         else:
-            cards = _encode_cards([move[0][1]])
+            cards_vec = _encode_cards([move_cards])
 
-        turn_history.append([action, player] + cards)
+        turn_history.append([action_idx, player_idx] + cards_vec)
 
-    flat_history = [item for sublist in turn_history for item in sublist]
-    vector += list(flat_history)
+    # Flatten the history
+    flat_history = [item for turn in turn_history for item in turn]
+    assert len(flat_history) == game_state.N_HISTORY * history_len, f"The length of the history is not correct: {len(flat_history)}"
+
+    vector.extend(flat_history)
 
     return vector
 
@@ -147,14 +134,17 @@ def _opponent_cards_as_vector(game_state):
     Used as label data for the model.
     """
     vector = []
-    for idx, player in enumerate(game_state.players):
-        if player == game_state.player_to_play:
+    player_to_play = game_state.player_to_play
+    players = game_state.players
+
+
+    for idx, player in enumerate(players):
+        if player is player_to_play:
             continue
         # Player idx (1-4)
-        vector += [game_state.players.index(player) + 1]
+        vector.append(idx + 1)
         # Encode the opponent's hand
-        vector += _encode_cards(player.hand)
-
+        vector.extend(_encode_cards(player.hand))
     return vector
 
 def _encode_cards(cards, fill = 0):

@@ -1,8 +1,8 @@
 from moskaengine.players.random_player import RandomPlayer as Random
 from moskaengine.game.game import MoskaGame
-from moskaengine.utils.game_utils import save_game_vector, save_game_state_vector_batch, save_opponent_vector_batch
 
 import os
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -17,12 +17,14 @@ def run_simulation(seed):
     game = MoskaGame(players,
                      computer_shuffle,
                      save_vectors=True,
+                     print_info=False
                      )
     while not game.is_end_state:
         game.next()
+
     return game.state_data, game.opponent_data
 
-def writer(queue, batch_size=10_000_000):
+def writer(queue, max_batch_size_mb=50):
     save_folder_states = os.path.join("../vectors/state")
     save_folder_opponents = os.path.join("../vectors/opponent")
     os.makedirs(save_folder_states, exist_ok=True)
@@ -31,24 +33,45 @@ def writer(queue, batch_size=10_000_000):
     state_batch = []
     opponent_batch = []
     batch_counter = 0
+    job_uuid = uuid.uuid4()
 
     while True:
         item = queue.get()
         if item == "DONE":
             break
         state_data, opponent_data = item
-        state_batch.extend(state_data)
-        opponent_batch.extend(opponent_data)
 
-        if len(state_batch) >= batch_size:
-            state_df = pd.DataFrame(state_batch)
-            opp_df = pd.DataFrame(opponent_batch)
+        state_batch.append(np.array(state_data))
+        opponent_batch.append(np.array(opponent_data))
 
-            state_path = os.path.join(save_folder_states, f"states_batch_{uuid.uuid4()}_{batch_counter}.parquet")
-            opp_path = os.path.join(save_folder_opponents, f"opponents_batch_{uuid.uuid4()}_{batch_counter}.parquet")
+        # Estimate total batch size in MB
+        state_size = sum(arr.nbytes for arr in state_batch) / (1024 ** 2)
+        opponent_size = sum(arr.nbytes for arr in opponent_batch) / (1024 ** 2)
+        total_size = state_size + opponent_size
 
-            state_df.to_parquet(state_path, engine='pyarrow')
-            opp_df.to_parquet(opp_path, engine='pyarrow')
+        if total_size >= max_batch_size_mb:
+            # Stack numpy arrays
+            state_stack = np.vstack(state_batch)
+            opponent_stack = np.vstack(opponent_batch)
+
+            state_path = os.path.join(save_folder_states, f"states_batch_{job_uuid}_{batch_counter}.parquet")
+            opp_path = os.path.join(save_folder_opponents, f"opponents_batch_{job_uuid}_{batch_counter}.parquet")
+
+            # Convert numpy array to pyarrow Table
+            state_table = pa.Table.from_arrays(
+                [pa.array(state_stack[:, i]) for i in range(state_stack.shape[1])],
+                names=[f"col_{i}" for i in range(state_stack.shape[1])]
+            )
+
+            # Write parquet directly
+            pq.write_table(state_table, state_path, compression='snappy')
+
+            opp_table = pa.Table.from_arrays(
+                [pa.array(opponent_stack[:, i]) for i in range(opponent_stack.shape[1])],
+                names=[f"col_{i}" for i in range(opponent_stack.shape[1])]
+            )
+
+            pq.write_table(opp_table, opp_path, compression='snappy')
 
             batch_counter += 1
             state_batch.clear()
@@ -56,20 +79,33 @@ def writer(queue, batch_size=10_000_000):
 
     # Save any remaining data when finishing
     if state_batch:
-        state_df = pd.DataFrame(state_batch)
-        opp_df = pd.DataFrame(opponent_batch)
+        state_stack = np.vstack(state_batch)
+        opponent_stack = np.vstack(opponent_batch)
 
-        state_path = os.path.join(save_folder_states, f"states_batch_{uuid.uuid4()}_{batch_counter}.parquet")
-        opp_path = os.path.join(save_folder_opponents, f"opponents_batch_{uuid.uuid4()}_{batch_counter}.parquet")
+        state_path = os.path.join(save_folder_states, f"states_batch_{job_uuid}_{batch_counter}.parquet")
+        opp_path = os.path.join(save_folder_opponents, f"opponents_batch_{job_uuid}_{batch_counter}.parquet")
 
-        state_df.to_parquet(state_path, engine='pyarrow')
-        opp_df.to_parquet(opp_path, engine='pyarrow')
+        # Convert numpy array to pyarrow Table
+        state_table = pa.Table.from_arrays(
+            [pa.array(state_stack[:, i]) for i in range(state_stack.shape[1])],
+            names=[f"col_{i}" for i in range(state_stack.shape[1])]
+        )
+
+        # Write parquet directly
+        pq.write_table(state_table, state_path, compression='snappy')
+
+        opp_table = pa.Table.from_arrays(
+            [pa.array(opponent_stack[:, i]) for i in range(opponent_stack.shape[1])],
+            names=[f"col_{i}" for i in range(opponent_stack.shape[1])]
+        )
+
+        pq.write_table(opp_table, opp_path, compression='snappy')
 
 def main():
     total_games = 2000
     print_every = 100
 
-    queue = Queue()
+    queue = Queue(maxsize=cpu_count() * 2)
 
     writer_process = Process(target = writer, args=(queue,10_000_000))
     writer_process.start()
@@ -78,7 +114,7 @@ def main():
     with Pool(processes=cpu_count()) as pool:
         for state_data, opponent_data in pool.imap_unordered(run_simulation, range(total_games)):
             queue.put((state_data, opponent_data))
-
+            # print(len(state_data), len(opponent_data))
             if completed % print_every == 0:
                 print(f"{completed}/{total_games} games completed...")
             completed += 1
@@ -92,4 +128,4 @@ if __name__ == '__main__':
     end = time.time()
     avg = (end - start) / 2000
     print(f"Finished in {end - start:.2f} seconds")
-    print(f"Average time per game: {avg:.2f} seconds")
+    print(f"Average time per game: {avg:.8f} seconds")
