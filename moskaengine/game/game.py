@@ -5,7 +5,7 @@ from moskaengine.utils.card_utils import basic_repr_game
 
 from itertools import combinations
 import random
-from collections import defaultdict
+from collections import deque
 
 from moskaengine.utils.game_utils import state_as_vector, save_game_vector
 
@@ -61,8 +61,13 @@ class MoskaGame:
         self.draw_undefended = False
 
         # Initialize the deck
-        self.deck = StandardDeck(shuffle=True, perfect_info=perfect_info)
         self.reference_deck = StandardDeck(shuffle=False, perfect_info=True)
+        self.deck = StandardDeck(shuffle=True, perfect_info=perfect_info)
+
+        # Initialize
+        self.all_cards = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
+
+        self.card_collection = self.deck.copy()
 
         # Game variables
         self.cards_killed = []
@@ -83,10 +88,7 @@ class MoskaGame:
         # NOTE: Only initialized for the game state vector
         self.player_to_play = self.main_attacker
 
-        # Initialize
-        self.all_cards = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
 
-        self.card_collection = self.deck.copy()
 
         # Players draw their hand
         for player in self.players:
@@ -98,6 +100,8 @@ class MoskaGame:
             # Draw trump card
             self.trump_card = self.deck.pop(1)[0]
             self.trump_card.is_public = True
+            self.trump_card.is_unknown = False
+            self.trump_card.is_private = False
             # print(f"Trump card: {self.trump_card}")
 
             # Check if a player has the equivalent of 2 of trump and if so, switch the card
@@ -157,8 +161,13 @@ class MoskaGame:
         # for card in self.card_collection:
         #     if not card.is_unknown:
         #         remove.add((card.suit, card.value))
-        remove = {(c.suit, c.value) for c in self.card_collection.cards if not c.is_unknown}
+        remove = {(c.suit, c.value) for c in self.card_collection if not c.is_unknown}
         return self.all_cards - remove
+
+    # def get_unknown_cards(self):
+    #     """Returns the Card objects of all unknown cards"""
+    #     unknown_cards = {c for c in self.card_collection if c.is_unknown}
+    #     return unknown_cards
 
     def get_non_public_cards(self):
         """Returns the (suit, value) pairs of all unknown cards + private cards"""
@@ -166,8 +175,13 @@ class MoskaGame:
         # for card in self.card_collection:
         #     if card.is_public:
         #         remove.add((card.suit, card.value))
-        remove = {(c.suit, c.value) for c in self.card_collection.cards if c.is_public}
+        remove = {(c.suit, c.value) for c in self.card_collection if c.is_public}
         return self.all_cards - remove
+
+    # def get_non_public_cards(self):
+    #     """Returns the Card objects of all non-public cards"""
+    #     remove = {(c.suit, ) for c in self.card_collection if c.is_public}
+    #     return self.all_cards - remove
 
     def new_attack(self, main_attacker):
         """Initialize new attack move with the main_attacker as starting player."""
@@ -274,7 +288,7 @@ class MoskaGame:
                 defend_options = []
                 for card in player.hand:
                     # Check if the card can defend the to_defend card
-                    if card.suit == self.trump_card.suit and not to_defend.is_trump():
+                    if card.suit == self.trump_card.suit and not to_defend.suit == self.trump_card.suit:
                         # Can always defend with trump on a non-trump card
                         defend_options.append(('Defend', (card, to_defend)))
                     elif card.suit == to_defend.suit and card.value > to_defend.value:
@@ -288,7 +302,7 @@ class MoskaGame:
             # Koplaus logic
             # Check if there is already a kopled card on the table
             if not any(card.kopled for card in self.cards_to_defend) and self.deck:
-                next_card = self.deck.cards[0]
+                next_card = self.deck.cards[0].make_copy()
                 next_card.is_public = True
                 next_card.is_unknown = False
 
@@ -409,9 +423,8 @@ class MoskaGame:
 
             card_to_defend = action[1][1]
 
-            # If this is False, the card can't fall a card on the table, and therefore it is added to the cards_to_defend
-
-            if not action[2]:
+            # If the kopled card can't defend a card on the table, it must be added to the cards_to_defend
+            if card_to_defend is None:
                 self.cards_to_defend.append(kopled_card)
 
             # Otherwise, the card can fall a card on the table
@@ -496,58 +509,153 @@ class MoskaGame:
         else:
             raise NotImplementedError('Action to execute not implemented.')
 
+    # def make_deepcopy(self):
+    #     """Returns a deepcopy of the MoskaGame"""
+    #     ### Deepcopy code for checks
+    #     # from copy import deepcopy
+    #     # new = deepcopy(self)
+    #     # new.print_info = False
+    #     # return new
+    #     ### Faster code
+    #     new = MoskaGame(0, 0, 0, False)
+    #     players = [p.make_copy() for p in self.players]
+    #
+    #     ### We copy all the players in all the places
+    #     new.players = []
+    #     player_ids = {}  # dict of all the players with their copy
+    #     for p in self.players:
+    #         copy_p = p.make_copy()
+    #         player_ids[id(p)] = copy_p
+    #         new.players.append(copy_p)
+    #
+    #     new.computer_shuffle = self.computer_shuffle
+    #     new.print_info = False
+    #     new.perfect_info = True
+    #     new.n_turns = self.n_turns
+    #     self.debug = False
+    #
+    #     # Copy player variables
+    #     new.attackers = [player_ids[id(p)] for p in self.attackers]
+    #     new.defender = player_ids.get(id(self.defender), None)
+    #     new.current_attacker = self.current_attacker
+    #     new.draw_undefended = self.draw_undefended
+    #     new.draw_order = [player_ids[id(p)] for p in self.draw_order]
+    #     new.player_to_play = player_ids[id(self.player_to_play)]
+    #     new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
+    #     new.loser = player_ids.get(id(self.loser), None)
+    #
+    #
+    #     ### And now we copy all the cards changing each card in all places
+    #     card_ids = {}  # dict of all the cards with their copy
+    #     new.card_collection = []
+    #
+    #
+    #     for card in self.card_collection:
+    #         # Change card on all different places
+    #         copy_card = card.make_copy()
+    #         card_ids[id(card)] = copy_card
+    #         new.card_collection.append(copy_card)
+    #
+    #     # Deck
+    #     new.deck = self.deck.copy()
+    #     new.reference_deck = self.reference_deck
+    #     new.trump_card = self.trump_card
+    #
+    #     # General information
+    #     new.is_end_state = self.is_end_state
+    #     new.all_cards = self.all_cards
+    #     new.current_action = self.current_action
+    #     new.attacker_to_start_throwing = self.attacker_to_start_throwing
+    #     new.history = self.history.copy()
+    #
+    #     for player_idx, p in enumerate(self.players):
+    #         new.players[player_idx].hand = [c for c in p.hand]
+    #
+    #     new.cards_to_defend = [c for c in self.cards_to_defend]
+    #     new.cards_killed = [(p[0], p[1]) for p in self.cards_killed]
+    #     new.cards_discarded = [c for c in self.cards_discarded]
+    #     return new
+
+    # def make_deepcopy(self):
+    #     """Returns a deepcopy of the MoskaGame using custom fast copy logic."""
+    #
+    #     # --- 1. Create new base game instance
+    #     new = MoskaGame(0, 0, 0, False)
+    #     new.print_info = False
+    #     new.perfect_info = True
+    #     self.debug = False
+    #
+    #     # --- 2. Copy players and keep a mapping
+    #     player_ids = {}
+    #     new.players = []
+    #     for p in self.players:
+    #         copy_p = p.make_copy()
+    #         player_ids[id(p)] = copy_p
+    #         new.players.append(copy_p)
+    #
+    #     # --- 3. Copy simple attributes
+    #     new.computer_shuffle = self.computer_shuffle
+    #     new.n_turns = self.n_turns
+    #
+    #     # --- 4. Copy references to players
+    #     new.attackers = [player_ids[id(p)] for p in self.attackers]
+    #     new.defender = player_ids.get(id(self.defender), None)
+    #     new.current_attacker = self.current_attacker
+    #     new.draw_undefended = self.draw_undefended
+    #     new.draw_order = [player_ids[id(p)] for p in self.draw_order]
+    #     new.player_to_play = player_ids[id(self.player_to_play)]
+    #     new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
+    #     new.loser = player_ids.get(id(self.loser), None)
+    #
+    #     # --- 5. Copy card objects and build card ID map
+    #     card_ids = {}
+    #     new.card_collection = []
+    #     for card in self.card_collection:
+    #         copy_card = card.make_copy()
+    #         card_ids[id(card)] = copy_card
+    #         new.card_collection.append(copy_card)
+    #
+    #     # --- 6. Copy deck as card objects
+    #     new.deck = self.deck.copy()
+    #     # new.deck = StandardDeck()
+    #     # new.deck.cards = deque([card_ids[id(card)] for card in self.deck.cards])
+    #     new.reference_deck = self.reference_deck
+    #     new.trump_card = self.trump_card.make_copy()
+    #
+    #     # --- 7. Copy game state info
+    #     new.is_end_state = self.is_end_state
+    #     new.all_cards = self.all_cards
+    #     new.current_action = self.current_action
+    #     new.attacker_to_start_throwing = self.attacker_to_start_throwing
+    #     new.history = self.history.copy()
+    #
+    #     # --- 8. Copy players' hands using copied cards
+    #     for i, old_player in enumerate(self.players):
+    #         new.players[i].hand = [card_ids[id(c)] for c in old_player.hand]
+    #
+    #     # --- 9. Copy all card sets using copied cards
+    #     new.cards_to_defend = [card_ids[id(c)] for c in self.cards_to_defend]
+    #     for p in self.cards_killed:
+    #         print("p", p)
+    #     new.cards_killed = [(card_ids[id(p[0])], card_ids[id(p[1])]) for p in self.cards_killed]
+    #     new.cards_discarded = [card_ids[id(c)] for c in self.cards_discarded]
+    #
+    #     return new
+
     def make_deepcopy(self):
-        """Returns a deepcopy of the MoskaGame, faster than deepcopy"""
-        ### Deepcopy code for checks
-        # from copy import deepcopy
-        # new = deepcopy(self)
-        # new.print_info = False
-        # return new
-        ### Faster code
-        new = MoskaGame(0, 0, 0, False)
-        players = [p.make_copy() for p in self.players]
-
-        ### We copy all the players in all the places
-        new.players = []
-        player_ids = {}  # dict of all the players with their copy
-        for p in self.players:
-            copy_p = p.make_copy()
-            player_ids[id(p)] = copy_p
-            new.players.append(copy_p)
-
-        new.attackers = [player_ids[id(p)] for p in self.attackers]
-        new.draw_order = [player_ids[id(p)] for p in self.draw_order]
-        new.player_to_play = player_ids[id(self.player_to_play)]
-        new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
-        new.defender = player_ids.get(id(self.defender), None)
-        new.loser = player_ids.get(id(self.loser), None)
-
-        ### Copy different, more general information
-        new.is_end_state = self.is_end_state
-        new.computer_shuffle = self.computer_shuffle
-        new.all_cards = self.all_cards
-        new.current_action = self.current_action
-        new.current_attacker = self.current_attacker
-        new.attacker_to_start_throwing = self.attacker_to_start_throwing
-        new.reflected_trumps = self.reflected_trumps.copy()  # (suit, value) pairs
-        new.history = self.history.copy()
+        # TODO: Remake this
+        from copy import deepcopy
+        new = deepcopy(self)
         new.print_info = False
 
-        ### And now we copy all the cards changing each card in all places
-        new.card_collection = []
-        card_ids = {}  # dict of all the cards with their copy
-        for card in self.card_collection:
-            # Change card on all different places
-            copy_card = card.make_copy()
-            card_ids[id(card)] = copy_card
-            new.card_collection.append(copy_card)
-
-        for player_idx, p in enumerate(self.players):
-            new.players[player_idx].hand = [card_ids[id(c)] for c in p.hand]
-        new.deck = [card_ids[id(c)] for c in self.deck]
-        new.cards_to_defend = [card_ids[id(c)] for c in self.cards_to_defend]
-        new.cards_killed = [(card_ids[id(p[0])], card_ids[id(p[1])]) for p in self.cards_killed]
+        # lsit = []
+        # for card in new.card_collection:
+        #     if card.is_unknown:
+        #         lsit += [card]
+        #
+        # print("Unknown cards:", len(lsit), lsit)
         return new
+
 
     def next(self):
         """Chooses and performs an action/move"""

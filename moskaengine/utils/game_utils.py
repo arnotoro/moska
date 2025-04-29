@@ -73,27 +73,27 @@ def _game_state_as_vector(game_state):
     }
 
     # The cards left in the deck
-    # vector.append(len(game_state.deck.cards))
+    vector.append(len(game_state.deck.cards))
 
     # The cards on the table
-    # vector.extend(_encode_cards(game_state.cards_to_defend))
+    vector.extend(_encode_cards(game_state.cards_to_defend))
 
     # The discarded cards i.e., not in the game anymore
     for item in game_state.cards_discarded:
         killed_list.append(item)
-    # vector.extend(_encode_cards(killed_list))
+    vector.extend(_encode_cards(killed_list))
 
     # The current player idx (1-4)
-    # vector.append((game_state.players.index(game_state.player_to_play) + 1))
+    vector.append((game_state.players.index(game_state.player_to_play) + 1))
 
     # Current player's hand
-    # vector.extend(_encode_cards(game_state.player_to_play.hand))
+    vector.extend(_encode_cards(game_state.player_to_play.hand))
 
     # Number of cards in each player's hand
-    # vector.extend(len(player.hand) for player in game_state.players)
+    vector.extend(len(player.hand) for player in game_state.players)
 
     # Turn number
-    # vector.append(game_state.n_turns)
+    vector.append(game_state.n_turns)
 
     # Move history for the last N turns, default 5
     player_indices = {pl.name: idx + 1 for idx, pl in enumerate(game_state.players)}

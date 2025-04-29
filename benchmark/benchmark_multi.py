@@ -1,6 +1,5 @@
 from moskaengine.players.random_player import RandomPlayer as Random
 from moskaengine.game.game import MoskaGame
-from moskaengine.utils.game_utils import save_game_vector, save_game_state_vector_batch, save_opponent_vector_batch
 import os
 import time
 import uuid
@@ -14,7 +13,6 @@ def run_simulation(seed):
                      computer_shuffle,
                      save_vectors=True,
                      state_folder="multi_test_100"
-
                      )
     while not game.is_end_state:
         game.next()
@@ -42,8 +40,8 @@ def writer(queue):
             opp_writer.writerows(opponent_data)
 
 if __name__ == '__main__':
-    total_games = 2000
-    print_every = 100
+    total_games = 1
+    print_every = 1
     start_time = time.time()
 
     losses = {name: 0 for name in ['Random1', 'Random2', 'Random3', 'Random4']}  # or however many players

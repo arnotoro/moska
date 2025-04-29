@@ -102,8 +102,8 @@ def writer(queue, max_batch_size_mb=50):
         pq.write_table(opp_table, opp_path, compression='snappy')
 
 def main():
-    total_games = 2000
-    print_every = 100
+    total_games = 1
+    print_every = 1
 
     queue = Queue(maxsize=cpu_count() * 2)
 

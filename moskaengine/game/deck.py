@@ -33,7 +33,7 @@ class Card:
     is_private = False # Does the holder know the card
     is_unknown = True # Does no one know the card
 
-    def __init__(self, value, suit, kopled = False, trump_suit = None):
+    def __init__(self, value=None, suit=None, kopled = False, trump_suit = None):
         self.value = value
         self.suit = suit
         self.kopled = kopled
@@ -77,7 +77,7 @@ class Card:
 
         return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
 
-    def reset(self):
+    def reset(self, suit=None, value=None, trump_suit=None):
         """Reset values or make unknown (useful for keeping same memory address)"""
         # Keeping the same memory address is adamant for this program
         # (not only the copy) as otherwise self.card_collection would
@@ -92,8 +92,8 @@ class Card:
     def make_copy(self):
         """Returns a copy of the card"""
         new = Card()
-        new.suit = self.suit
         new.value = self.value
+        new.suit = self.suit
         new.trump_suit = self.trump_suit
         new.is_public = self.is_public
         new.is_private = self.is_private
@@ -137,6 +137,15 @@ class Card:
         self.value = value
         self.is_unknown = False
 
+    def from_card(self, other_card):
+        """Copy data from another card"""
+        self.suit = other_card.suit
+        self.value = other_card.value
+        self.is_unknown = other_card.is_unknown
+        self.is_private = other_card.is_private
+        self.is_public = other_card.is_public
+        self.trump_suit = other_card.trump_suit
+
 class StandardDeck:
     "A deck of playing cards."
 
@@ -173,7 +182,10 @@ class StandardDeck:
 
     def __hash__(self):
         return hash(tuple(self.cards))
-    
+
+    def __iter__(self):
+        return iter(self.cards)
+
     def shuffle(self):
         shuffle(self.cards)
 
