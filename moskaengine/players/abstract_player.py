@@ -83,63 +83,40 @@ class AbstractPlayer(ABC):
         card_played.is_public = True
 
         return card_played
-    
-    def can_throw(self, fallback_identities, cards):
-        """Check if the player can throw the given cards
-        Fallback identities are the options of the cards if it is unknown
-        """
-        poss = []
-        cards_set = set(cards)
-        fallback = 0
 
+    def can_throw(self, fallback_identities, cards):
+        """Check if the player can throw the given cards. Fallback identities are the options for unknown cards."""
+        cards_set = set(cards)  # Set of target cards for fast lookups
+        fallback = 0
+        poss = []
+
+        # Classify the cards in hand into known and unknown cards
+        known_cards = set()
         for card in self.hand:
             if card.is_unknown:
                 fallback += 1
             else:
-                identity = (card.suit, card.value)
+                known_cards.add(card)  # Store the card directly
 
-                # Check if this card has an identity that match a card in cards
-                if identity in cards_set:
-                    poss.append({identity})
+        # Match known cards in hand with the cards to throw
+        for card in cards:
+            if card in known_cards:
+                poss.append({card})  # Known valid card
 
-        # Easy case, poss is not big enough to consist of len(cards) cards
-        # if len(poss) < len(cards):
-        if len(poss) + fallback < len(cards):
-            return False
+        # If we don't have enough known cards to satisfy the throw, add fallback identities
+        remaining_needed = len(cards) - len(poss)
+        if remaining_needed > 0:
+            fallback_identities_needed = min(fallback, remaining_needed)
+            poss += [set(fallback_identities) for _ in range(fallback_identities_needed)]
 
-        # Add fallbacks, the minimum amount needed
-        poss += [fallback_identities.copy() for _ in range(min(fallback, len(cards)))]
-        ### We need to check if we can play cards, having poss
-        # # Easy case, one of the cards is not in poss
-        # p = set()
-        # for i in poss:
-        #     p = p.union(i)
-        # for c in cards:
-        #     if c not in p:
-        #         return False
-        # Greedy approach: take the nth card from the first allowed poss
-        poss2 = [i.copy() for i in poss]
-        for c in cards:
-            for idx, p in enumerate(poss2):
-                if c in p:
-                    poss2.pop(idx)
-                    break
-            else:
-                return False
-        return True
+        # Check if we can match all cards in poss, either by direct match or fallback
+        remaining_cards = set(cards)  # We need to match each card in cards
+        poss_set = set(card for subset in poss for card in subset)  # Flatten poss into a set for faster checking
 
-        # # Otherwise iterating through all options
-        # # -> takes a long time
-        # for _ in range(len(poss) - len(cards)):
-        #     cards.append(0)
-        # for perm in permutations(cards, r=len(cards)):
-        #     # print(perm, poss)
-        #     for idx, card in enumerate(perm):
-        #         if card != 0 and card not in poss[idx]:
-        #             break
-        #     else:
-        #         return True
-        # return False
+        # If poss contains all the needed cards, we can throw
+        if remaining_cards.issubset(poss_set):
+            return True
+        return False
 
     def determinize_hand(self, game_state):
         """Returns a possible determinization for the hand of this player"""

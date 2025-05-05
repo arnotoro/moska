@@ -1,14 +1,16 @@
+from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
 from moskaengine.players.random_player import RandomPlayer as Random
+from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
 from moskaengine.game.game import MoskaGame
 import random
 import time
 
-players = [Random('Random1'), Random('Random2')]
+players = [Random('Random1'), DeterminizedMCTS('Random2')]
 computer_shuffle = True
 
 # Track losses for each player
 losses = {'Random1': 0, 'Random2': 0}
-total_games = 1000
+total_games = 10
 
 # Start timing
 start_time = time.time()

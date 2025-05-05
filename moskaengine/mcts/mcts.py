@@ -27,9 +27,10 @@ class Node:
         if self.game_state is not None:
             return self.game_state
         assert self.parent is not None
+
         for action_to_perform, child in self.parent.children.items():
             if id(child) == id(self):
-                game = self.parent.get_game_state().make_deepcopy()
+                game = self.parent.get_game_state().clone_for_rollout()
                 game.execute_action(action_to_perform)
                 self.is_end_state = game.is_end_state
                 return game
@@ -81,8 +82,8 @@ class MCTS:
 
             leaf_node = self.select()
             self.expand(leaf_node)
-            lost_name = self.simulate(leaf_node)
-            self.backpropagate(leaf_node, lost_name)
+            loser_name = self.simulate(leaf_node)
+            self.backpropagate(leaf_node, loser_name)
         print(' ' * 50, end='\r')
 
         # Return the information of each action with their performance
@@ -148,7 +149,8 @@ class MCTS:
 
         action = choose_random_action(list(leaf_node.children.keys()))
         # Execute
-        game = leaf_node.get_game_state().make_deepcopy()
+        game = leaf_node.get_game_state().clone_for_rollout()
+        assert game is not None
         game.execute_action(action)
 
         # Traverse the tree randomly

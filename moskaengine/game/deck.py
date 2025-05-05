@@ -17,7 +17,6 @@ def suit_to_symbol(suit):
 def value_to_letter(value):
     return CARD_VALUES_SYMBOLS[value] if value in CARD_VALUES_SYMBOLS else str(value)
 
-
 class Card:
     """ A regular Moska playing card.
 
@@ -62,19 +61,6 @@ class Card:
         return self.value < other.value
 
     def __str__(self):
-        # if self.is_unknown:
-        #     return "-X"
-        # else:
-        #     if self.is_private:
-        #         string = "P"
-        #     else:
-        #         string = "A"
-        #
-        #     assert self.suit is not None
-        #     string += suit_to_symbol(self.suit)
-        #     string += value_to_letter(self.value)
-        #     return string
-
         return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
 
     def reset(self, suit=None, value=None, trump_suit=None):
@@ -98,6 +84,7 @@ class Card:
         new.is_public = self.is_public
         new.is_private = self.is_private
         new.is_unknown = self.is_unknown
+        new.kopled = self.kopled
         return new
 
     def is_trump(self):
@@ -152,7 +139,7 @@ class StandardDeck:
     seed_value : int = None
     cards : deque = None
 
-    def __init__(self, shuffle = True, seed_value = None, perfect_info = False):
+    def __init__(self, shuffle = True, seed_value = None, perfect_info = False, cards = None):
         self.seed_value = seed_value if seed_value else randint(0, 100_000_000)
         seed(self.seed_value)
         self.cards = deque(
@@ -215,7 +202,7 @@ class StandardDeck:
         self.cards.appendleft(card)
 
     def copy(self):
-        "Returns a copy of the deck."
+        "Returns a deep copy of the deck."
         new_deck = StandardDeck(shuffle=False, seed_value=self.seed_value)
-        new_deck.cards = self.cards.copy()
+        new_deck.cards = deque(card.make_copy() for card in self.cards)
         return new_deck

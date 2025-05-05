@@ -1,6 +1,5 @@
 from moskaengine.players.abstract_player import AbstractPlayer
 from moskaengine.utils.card_utils import basic_repr_game, basic_repr_player_actions
-from moskaengine.utils.player_utils import has_combinations
 
 
 class Human(AbstractPlayer):
