@@ -110,6 +110,7 @@ def _game_state_as_vector(game_state):
         player_idx = player_indices.get(move_player, 0)
 
         if isinstance(move_cards, (tuple, list)):
+            # TODO: Breaks here
             if move_cards[1] is None:
                 cards_vec = _encode_cards([move_cards[0]])
             else:

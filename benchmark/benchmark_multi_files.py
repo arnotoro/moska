@@ -1,4 +1,5 @@
 from moskaengine.players.random_player import RandomPlayer as Random
+from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
 from moskaengine.game.game import MoskaGame
 
 import os
@@ -12,7 +13,7 @@ from multiprocessing import Pool, cpu_count, Queue, Process
 
 
 def run_simulation(seed):
-    players = [Random('Random1'), Random('Random2'), Random('Random3'), Random('Random4')]
+    players = [Random('Random1'), DeterminizedMCTS('Random2')]
     computer_shuffle = True
     game = MoskaGame(players,
                      computer_shuffle,

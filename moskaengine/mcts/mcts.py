@@ -7,56 +7,51 @@ class Node:
     """
 
     """
-    W = 0 # Score
-    N = 0 # Number of visits
+
 
     def __init__(self, parent=None, game_state=None):
-        if game_state is None:
-            self.game_state = None
-            self.is_end_state = None
-        else:
-            self.game_state = game_state
-            self.is_end_state = game_state.is_end_state
-
+        self.game_state = game_state
+        self.is_end_state = game_state.is_end_state if game_state else None
         self.is_explored = False
         self.parent = parent
         self.children = {}
+        self.W = 0  # Score
+        self.N = 0  # Number of visits
 
     def get_game_state(self):
         """For preventing from finding all unsearched game states"""
         if self.game_state is not None:
             return self.game_state
-        assert self.parent is not None
 
+        parent_state = self.parent.get_game_state().clone_for_rollout()
         for action_to_perform, child in self.parent.children.items():
-            if id(child) == id(self):
-                game = self.parent.get_game_state().clone_for_rollout()
-                game.execute_action(action_to_perform)
-                self.is_end_state = game.is_end_state
-                return game
+            if child is self:
+                parent_state.execute_action(action_to_perform)
+                self.is_end_state = parent_state.is_end_state
+                self.game_state = parent_state
+                return parent_state
         else:
-            raise BaseException('Unable to find child in the children of its parent')
+            raise BaseException("Unable to find child in the parent's children")
 
     def uct_select(self, expl_const):
-        child = []
-        for action_played, mcts_node in self.children.items():
-            N, W = mcts_node.N, mcts_node.W
-            if N > 0:
-                child.append((action_played, N, W))
+        assert self.N > 0 and self.children
 
-        assert self.N > 0 # Check if node is explored
-        assert len(child) > 0 # At least one child must be explored
-
-        # Calculate the UCT value for each child
         const = expl_const * sqrt(log(self.N))
-        def uct_value(args):
-            _, N, W = args
-            return W / N + const * N**(-0.5)
+        best_value = float('-inf')
+        best_action = None
+        best_node = None
 
-        # Choose best child
-        best = max(child, key=uct_value)
-        return best[0], self.children[best[0]]
+        for action, child in self.children.items():
+            if child.N == 0:
+                continue
+            uct = (child.W / child.N) + const / sqrt(child.N)
+            if uct > best_value:
+                best_value = uct
+                best_action = action
+                best_node = child
 
+        assert best_node is not None
+        return best_action, best_node
 
 class MCTS:
     """
@@ -65,113 +60,89 @@ class MCTS:
     def __init__(self):
         self.node = None
         self.expl_rate = 0.7
-        self.player = None
+        # self.player = None
 
     def do_rollout(self, game_state, rollouts=1000, expl_rate=0.7):
         """
 
         """
         self.expl_rate = expl_rate
-
         # Create a new node
         self.node = Node(game_state=game_state)
 
         # Perform rollouts
         for rollout in range(rollouts):
-            print(f"Doing rollout {rollout} for {game_state.player_to_play.name}", end="\r")
+            print(f"Rollout {rollout}/{rollouts} for {game_state.player_to_play.name}", end="\r")
 
             leaf_node = self.select()
             self.expand(leaf_node)
             loser_name = self.simulate(leaf_node)
             self.backpropagate(leaf_node, loser_name)
+
         print(' ' * 50, end='\r')
 
-        # Return the information of each action with their performance
-        dct = {}
-        for action_played, child in self.node.children.items():
-            dct[action_played] = (child.W, child.N)
-
-        # Clear the node
+        result = {action: (child.W, child.N) for action, child in self.node.children.items()}
         self.node = None
-        return dct
+        return result
 
     def select(self):
         """Select a leaf node from the tree"""
-
-        mcts_node = self.node
+        node = self.node
 
         while True:
             # Check if we stop traversing
-            if not mcts_node.is_explored:
-                return mcts_node
-
-            if mcts_node.is_end_state is None:
-                mcts_node.get_game_state()
-
-            if mcts_node.is_end_state:
-                return mcts_node
+            if not node.is_explored or node.is_end_state:
+                return node
 
             # Otherwise, traverse to an unexplored child
-            for action, node in mcts_node.children.items():
-                if not node.is_explored:
-                    break
-            else:
-                action, node = mcts_node.uct_select(self.expl_rate)
+            for child in node.children.values():
+                if not child.is_explored:
+                    return child
 
-            mcts_node = node
+            _, node = node.uct_select(self.expl_rate)
 
-    def expand(self, leaf_node):
+    def expand(self, node):
         """Expand the leaf node from the tree, i.e. simulate all possible actions"""
-        if leaf_node.is_end_state is None:
-            leaf_node.get_game_state()
+        if node.is_end_state is None:
+            node.get_game_state()
 
-        if leaf_node.is_end_state:
+        if node.is_end_state:
             # Nothing to do
             return None
 
-        # Simulate all possible actions
-        game = leaf_node.get_game_state()
-        # Check which actions we're allowed to do
+        game = node.get_game_state()
         allowed = game.allowed_plays()
-        # Initialize the children of the leaf node
-        leaf_node.children = {action: Node(parent=leaf_node) for action in allowed}
-        leaf_node.is_explored = True
-
+        node.children = {action: Node(parent=node) for action in allowed}
+        node.is_explored = True
         return None
 
-    def simulate(self, leaf_node):
+    def simulate(self, node):
         """Play random game until an end state is reached, return loser"""
         # TODO: Check to stop after N steps
+        if node.is_end_state:
+            return node.get_game_state().loser.name
 
-        assert leaf_node.is_end_state is not None
-        if leaf_node.is_end_state:
-            return leaf_node.get_game_state().loser.name
+        game = node.get_game_state().clone_for_rollout()
+        actions = list(node.children.keys())
+        game.execute_action(choose_random_action(actions))
 
-        action = choose_random_action(list(leaf_node.children.keys()))
-        # Execute
-        game = leaf_node.get_game_state().clone_for_rollout()
-        assert game is not None
-        game.execute_action(action)
-
-        # Traverse the tree randomly
+        # Traverse the tree
         while not game.is_end_state:
-            # Execute a random action
-            allowed = game.allowed_plays()
-            action = choose_random_action(allowed)
-            game.execute_action(action)
+            game.execute_action(choose_random_action(game.allowed_plays()))
 
         # Return the loser
         return game.loser.name
 
-    def backpropagate(self, mcts_node, lost_name):
+    def backpropagate(self, node, loser_name):
         """Backpropagate the result of the simulation to the root node"""
         # Traverse the tree back to the root
-        while mcts_node is not None:
+        while node:
             # Update the number of visits
-            mcts_node.N += 1
+            node.N += 1
+            parent = node.parent
 
             # Increase the score
-            if mcts_node.parent is not None:
-                if mcts_node.parent.get_game_state().player_to_play.name != lost_name:
-                    mcts_node.W += 1
-            mcts_node = mcts_node.parent
+            if parent:
+                if parent.get_game_state().player_to_play.name != loser_name:
+                    node.W += 1
+            node = node.parent

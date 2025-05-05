@@ -430,7 +430,7 @@ class MoskaGame:
 
         if action_type == 'ThrowCards':
             # PlayToOther i.e., play to table for the defender to fall
-            if action[1]:
+            if action[1] is not None:
                 for card in action[1]:
                     card_played = self.player_to_play.discard_card(self, card.suit, card.value)
                     self.cards_to_defend.append(card_played)

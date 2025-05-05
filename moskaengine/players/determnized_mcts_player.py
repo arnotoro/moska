@@ -90,7 +90,6 @@ class DeterminizedMCTS(AbstractPlayer):
 
         # Get allowed plays from the real (non-determinized) game state
         allowed_actions = set(game_state.allowed_plays())
-        print(allowed_actions)
         # Filter total_ratings to only include allowed actions
         valid_total_ratings = {action: (W, N) for action, (W, N) in total_ratings.items() if
                                action in allowed_actions}
