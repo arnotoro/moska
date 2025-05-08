@@ -1,34 +1,36 @@
-from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
+from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
 from moskaengine.players.random_player import RandomPlayer as Random
-from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
-from moskaengine.game.game import MoskaGame
+from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
+from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
+
+from moskaengine.game.engine import MoskaGame
 import random
 import time
 
-players = [Random('Random1'), DeterminizedMCTS('Random2')]
+players = [Heuristic('Heuristic'), DeterminizedMCTS('MCTS', deals=5, rollouts=100, expl_rate=0.7, scoring="win_rate")]
+# players = [Random('Random1'), Random('Random2'), Heuristic('Heuristic3'), Heuristic('Heuristic4')]
 computer_shuffle = True
 
 # Track losses for each player
-losses = {'Random1': 0, 'Random2': 0}
-total_games = 10
+losses = {player.name: 0 for player in players}  # or however many players
+total_games = 5
 
 # Start timing
 start_time = time.time()
 
-# print(random.choice(['Random1', 'Random2']))
-
 for i in range(total_games):
     random.seed(random.randint(0, 1000000))
-    game = MoskaGame(players, computer_shuffle, main_attacker='Random1', print_info=False)
+    game = MoskaGame(players, computer_shuffle, print_info=False)
     while not game.is_end_state:
         game.next()
 
     # Record the loser directly
+    print(f'Game {i + 1} is lost by {game.loser} with hand {game.loser.hand}')
     loser_name = str(game.loser).replace('Player ', '')  # Clean up the name if needed
     losses[loser_name] += 1
 
     # Optional: Print progress
-    if i % 100 == 0 and i > 0:
+    if i % 1 == 0 and i > 0:
         elapsed_time = time.time() - start_time
         games_per_second = i / elapsed_time
         print(f'Completed {i} games. Speed: {games_per_second:.2f} games/second')
@@ -37,13 +39,10 @@ for i in range(total_games):
 total_time = time.time() - start_time
 games_per_second = total_games / total_time
 
-# Calculate winrates
-winrate_random1 = ((total_games - losses['Random1']) / total_games) * 100
-winrate_random2 = ((total_games - losses['Random2']) / total_games) * 100
-
+# Print final results
 print()
 print(f'Total games played: {total_games}')
 print(f'Total simulation time: {total_time:.2f} seconds')
 print(f'Average speed: {games_per_second:.2f} games/second')
-print(f'Random1 wins: {total_games - losses["Random1"]} ({winrate_random1:.2f}%)')
-print(f'Random2 wins: {total_games - losses["Random2"]} ({winrate_random2:.2f}%)')
+for name, loss in losses.items():
+    print(f'{name} losses: {loss} ({(loss / total_games) * 100:.2f}%)')

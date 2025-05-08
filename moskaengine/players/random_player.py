@@ -11,7 +11,7 @@ class RandomPlayer(AbstractPlayer):
     def choose_action(self, game_state):
         # Choose a random action from the allowed actions
         self.make_cards_known(game_state)
-        # print(f"Random players hand: {self.hand}")
+        # print(f"{self.name} players hand: {self.hand}")
 
         # Get the allowed actions
         allowed_actions = game_state.allowed_plays()

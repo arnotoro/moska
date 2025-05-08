@@ -84,7 +84,7 @@ class Human(AbstractPlayer):
                         if len(selected) > 1:
                             values = [card.value for card in selected]
                             if len(set(values)) == 1:
-                                return action_type, selected
+                                return action_type, tuple(selected)
                             else:
                                 print("Error: When playing multiple cards, all must have the same value.\n")
                                 continue
@@ -141,7 +141,7 @@ class Human(AbstractPlayer):
                 # This means that the card is not playable on any card on the table
                 if choice is None:
                     continue
-                deck_card = choice[1]
+                deck_card = choice[0]
                 to_defend.append(choice[0])
 
             # Check if the drawn card can be used to fall a card on the table
@@ -154,7 +154,7 @@ class Human(AbstractPlayer):
                         can_play = False
 
             while True:
-                print("Card drawn from deck is", repr(deck_card))
+                # print("Card drawn from deck is", repr(deck_card))
                 assert can_play is not None
 
                 # Check if the drawn card can be used to fall a card on the table
@@ -166,7 +166,6 @@ class Human(AbstractPlayer):
                 if len(to_defend) == 1:
                     return action_type, (deck_card, to_defend[0]), can_play
 
-                # TODO: If a card is playable only on one card, do not print all actions to ask.
                 n = 1
                 for i in to_defend:
                     if i is None:

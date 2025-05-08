@@ -1,6 +1,7 @@
 from moskaengine.players.random_player import RandomPlayer as Random
-from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
-from moskaengine.game.game import MoskaGame
+from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
+from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
+from moskaengine.game.engine import MoskaGame
 
 import os
 import numpy as np
@@ -8,12 +9,13 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import uuid
+import datetime
 import time
 from multiprocessing import Pool, cpu_count, Queue, Process
 
 
 def run_simulation(seed):
-    players = [Random('Random1'), DeterminizedMCTS('Random2')]
+    players = [Heuristic('Heuristic1'), Heuristic('Heuristic2'), Heuristic('Heuristic3'), Heuristic('Heuristic4')]
     computer_shuffle = True
     game = MoskaGame(players,
                      computer_shuffle,
@@ -26,8 +28,13 @@ def run_simulation(seed):
     return game.state_data, game.opponent_data
 
 def writer(queue, max_batch_size_mb=50):
-    save_folder_states = os.path.join("../vectors/state")
-    save_folder_opponents = os.path.join("../vectors/opponent")
+    # Add timestamp to ensure uniqueness
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    base_path = f"../vectors_10k_{timestamp}"
+    save_folder_states = os.path.join(base_path, "state")
+    save_folder_opponents = os.path.join(base_path, "opponent")
+
     os.makedirs(save_folder_states, exist_ok=True)
     os.makedirs(save_folder_opponents, exist_ok=True)
 
@@ -103,8 +110,8 @@ def writer(queue, max_batch_size_mb=50):
         pq.write_table(opp_table, opp_path, compression='snappy')
 
 def main():
-    total_games = 1
-    print_every = 1
+    total_games = 10_000
+    print_every = 100
 
     queue = Queue(maxsize=cpu_count() * 2)
 

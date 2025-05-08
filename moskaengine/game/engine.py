@@ -48,6 +48,7 @@ class MoskaGame:
             return
 
         self.players = players
+        self.player_ids = {player: idx for idx, player in enumerate(players, 1)}
         self.computer_shuffle = computer_shuffle
         self.print_info = print_info
         self.perfect_info = perfect_info
@@ -293,7 +294,7 @@ class MoskaGame:
             # Check if there is already a kopled card on the table
             if self.deck and not any(card.kopled for card in self.cards_to_defend):
                 next_card = self.deck.cards[0]
-                # next_card.is_public = True
+                # next_card.is_private = True
                 # next_card.is_unknown = False
 
                 for defend_card in self.cards_to_defend:
@@ -329,10 +330,13 @@ class MoskaGame:
             # If there are cards to throw
             if max_throws > 0:
                 for throw in range(1, max_throws + 1):
-                    # Any combination works
                     for option in itertools.combinations(possible_throws, r=throw):
                         if player.can_throw(self.get_non_public_cards(), list(option)):
-                            possible_actions.append(('ThrowCards', option))
+                            if len(option) == 1:
+                                possible_actions.append(('ThrowCards', option[0]))
+                            else:
+                                possible_actions.append(('ThrowCards', option))
+
         else:
             raise ValueError(f"Unknown action {action}")
 
@@ -431,9 +435,13 @@ class MoskaGame:
         if action_type == 'ThrowCards':
             # PlayToOther i.e., play to table for the defender to fall
             if action[1] is not None:
-                for card in action[1]:
-                    card_played = self.player_to_play.discard_card(self, card.suit, card.value)
+                if len(action[1]) == 1:
+                    card_played = self.player_to_play.discard_card(self, action[1].suit, action[1].value)
                     self.cards_to_defend.append(card_played)
+                else:
+                    for card in action[1]:
+                        card_played = self.player_to_play.discard_card(self, card.suit, card.value)
+                        self.cards_to_defend.append(card_played)
 
                 # Give the defender a new chance if cards changed
                 self.last_played_attacker = self.player_to_play

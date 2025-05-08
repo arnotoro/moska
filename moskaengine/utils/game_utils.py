@@ -105,13 +105,11 @@ def _game_state_as_vector(game_state):
     for move in game_state.history[-game_state.N_HISTORY:]:
         move_type, move_player = move[0][0], move[1]
         move_cards = move[0][1]
-
         action_idx = actions.get(move_type, 0)
         player_idx = player_indices.get(move_player, 0)
 
         if isinstance(move_cards, (tuple, list)):
-            # TODO: Breaks here
-            if move_cards[1] is None:
+            if not move_cards[1]:
                 cards_vec = _encode_cards([move_cards[0]])
             else:
                 cards_vec = _encode_cards([move_cards[0], move_cards[1]])
@@ -138,14 +136,15 @@ def _opponent_cards_as_vector(game_state):
     player_to_play = game_state.player_to_play
     players = game_state.players
 
+    opponents = [pl for pl in players if pl != player_to_play]
+    opponents = sorted(opponents, key=lambda p: game_state.player_ids[p])
 
-    for idx, player in enumerate(players):
-        if player is player_to_play:
-            continue
+    for opponent in opponents:
         # Player idx (1-4)
-        vector.append(idx + 1)
+        # vector.append(game_state.player_ids[opponent])
         # Encode the opponent's hand
-        vector.extend(_encode_cards(player.hand))
+        vector.extend(_encode_cards(opponent.hand))
+
     return vector
 
 def _encode_cards(cards, fill = 0):

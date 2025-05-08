@@ -1,7 +1,7 @@
-from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
+from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
 from moskaengine.players.random_player import RandomPlayer as Random
-from moskaengine.players.determnized_mcts_player import DeterminizedMCTS
-from moskaengine.game.game import MoskaGame
+from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
+from moskaengine.game.engine import MoskaGame
 import os
 import time
 import uuid
