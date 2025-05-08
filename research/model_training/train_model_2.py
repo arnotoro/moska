@@ -133,8 +133,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, epochs=5,
 
 
 if __name__ == "__main__":
-    input_file = "../../vectors_10k/state/states_10k.parquet"
-    label_file = "../../vectors_10k/opponent/opponents_10k.parquet"
+    input_file = "../../vectors_10k/state/states.parquet"
+    label_file = "../../vectors_10k/opponent/opponents.parquet"
 
     # Load the dataset
     dataset = CardVectorDataset(input_file, label_file)

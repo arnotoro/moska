@@ -31,7 +31,7 @@ def writer(queue, max_batch_size_mb=50):
     # Add timestamp to ensure uniqueness
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    base_path = f"../vectors_10k_{timestamp}"
+    base_path = f"../vectors_50k"
     save_folder_states = os.path.join(base_path, "state")
     save_folder_opponents = os.path.join(base_path, "opponent")
 
@@ -110,8 +110,8 @@ def writer(queue, max_batch_size_mb=50):
         pq.write_table(opp_table, opp_path, compression='snappy')
 
 def main():
-    total_games = 10_000
-    print_every = 100
+    total_games = 50_000
+    print_every = 1000
 
     queue = Queue(maxsize=cpu_count() * 2)
 

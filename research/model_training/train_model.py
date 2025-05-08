@@ -231,8 +231,8 @@ if __name__ == "__main__":
 
 
     # File paths
-    game_state_file = "../../vectors_10k/state/states_10k.parquet"
-    opponent_file = "../../vectors_10k/opponent/opponents_10k.parquet"
+    game_state_file = "../../vectors_10k/state/states.parquet"
+    opponent_file = "../../vectors_10k/opponent/opponents.parquet"
 
     # Load data
     train_loader, test_loader = load_and_prepare_data(game_state_file, opponent_file)
