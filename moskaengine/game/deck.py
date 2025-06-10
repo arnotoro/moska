@@ -126,12 +126,10 @@ class Card:
 
     def from_card(self, other_card):
         """Copy data from another card"""
+        assert self.is_unknown
         self.suit = other_card.suit
         self.value = other_card.value
-        self.is_unknown = other_card.is_unknown
-        self.is_private = other_card.is_private
-        self.is_public = other_card.is_public
-        self.trump_suit = other_card.trump_suit
+        self.is_unknown = False
 
 class StandardDeck:
     "A deck of playing cards."

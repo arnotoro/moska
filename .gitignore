@@ -2,9 +2,15 @@
 
 # Ignore __pycache__ directories
 __pycache__/
+.idea/
 
 *.egg-info/
 
 roadmap.md
 
-vectors/
+vectors*/
+results/
+
+*.ipynb
+*.png
+*.pdf

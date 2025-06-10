@@ -13,8 +13,6 @@ class HeuristicPlayer(AbstractPlayer):
 
         # Get the allowed actions
         allowed_actions = game_state.allowed_plays()
-        best_move = None
-        best_score = float("-inf")
 
         # If only one action is allowed, return it
         if len(allowed_actions) == 1:

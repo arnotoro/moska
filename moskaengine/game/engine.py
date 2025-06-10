@@ -171,7 +171,7 @@ class MoskaGame:
     #     unknown_cards = {c for c in self.card_collection if c.is_unknown}
     #     return unknown_cards
 
-    def get_non_public_cards(self):
+    def get_non_public_cards_tuples(self):
         """Returns the (suit, value) pairs of all unknown cards + private cards"""
         # remove = set()
         # for card in self.card_collection:
@@ -179,6 +179,10 @@ class MoskaGame:
         #         remove.add((card.suit, card.value))
         remove = {(c.suit, c.value) for c in self.card_collection if c.is_public}
         return self.all_cards - remove
+
+    def get_non_public_cards(self):
+        """Returns all Card objects that are not public."""
+        return [card for card in self.card_collection if not card.is_public]
 
     # def get_non_public_cards(self):
     #     """Returns the Card objects of all non-public cards"""
@@ -331,7 +335,7 @@ class MoskaGame:
             if max_throws > 0:
                 for throw in range(1, max_throws + 1):
                     for option in itertools.combinations(possible_throws, r=throw):
-                        if player.can_throw(self.get_non_public_cards(), list(option)):
+                        if player.can_throw(self.get_non_public_cards_tuples(), list(option)):
                             if len(option) == 1:
                                 possible_actions.append(('ThrowCards', option[0]))
                             else:
@@ -371,7 +375,6 @@ class MoskaGame:
             # TODO: Improve performance with sets?
             # The defending move from the target player for the current turn
             cards_played, cards_defended = [], []
-
             # Check if multiple cards are defended at the same time
             if isinstance(action[1], tuple):
                 # Single case
@@ -567,6 +570,9 @@ class MoskaGame:
             copy_pl = pl.make_copy()
             player_ids[id(pl)] = copy_pl
             new.players.append(copy_pl)
+
+        # Copy player_ids mapping from old players to new players
+        new.player_ids = {player_ids[id(pl)]: idx for pl, idx in self.player_ids.items()}
 
         new.deck = StandardDeck(shuffle=False, perfect_info=self.perfect_info)
         new.deck.cards = deque(card.make_copy() for card in self.deck.cards)

@@ -63,7 +63,7 @@ class AbstractPlayer(ABC):
         # TODO: Comment this
         for idx, card in enumerate(self.hand):
             if card.is_unknown:
-                if (suit, value) in game_state.get_non_public_cards():
+                if (suit, value) in game_state.get_non_public_cards_tuples():
                     if (suit, value) not in [(c.suit, c.value) for c in self.hand if not c.is_unknown]:
                         card.suit = suit
                         card.value = value
@@ -133,7 +133,7 @@ class AbstractPlayer(ABC):
         # Check if we need to do anything
         if len(unknown_cards) > 0:
             # We pop from all the unknown cards as possible cards
-            unknown = list(game_state.get_non_public_cards())
+            unknown = list(game_state.get_non_public_cards_tuples())
             for unknown_card in unknown_cards:
                 suit, value = unknown.pop(random.randint(0, len(unknown)-1))
                 unknown_card.from_suit_value(suit, value)

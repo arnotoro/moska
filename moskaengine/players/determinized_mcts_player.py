@@ -32,17 +32,19 @@ class DeterminizedMCTS(AbstractPlayer):
             card.is_public = True
 
         # Unknown cards are shuffled
-        unknown = list(game_state.get_non_public_cards())
-        random.shuffle(unknown)
+        unknown_tuples = list(game_state.get_non_public_cards_tuples())
+        random.shuffle(unknown_tuples)
 
         # Define the unknown cards in the card collection as random cards
         for card in game_state.card_collection:
             if card.is_unknown:
-                suit, value = unknown.pop(0)
+                # Case: Cards that are originally unknown
+                suit, value = unknown_tuples.pop(0)
                 card.from_suit_value(suit, value)
                 card.is_public = True
             elif card.is_private:
-                suit, value = unknown.pop(0)
+                # Case: Cards that were private (in opponents hands)
+                suit, value = unknown_tuples.pop(0)
                 card.is_private = False
                 card.is_unknown = True
                 card.from_suit_value(suit, value)
@@ -103,7 +105,7 @@ class DeterminizedMCTS(AbstractPlayer):
             if game_state.print_info:
                 print(f'{self} expects to not lose with {N} visits')
         elif self.scoring == "win_rate":
-            action_to_play, (W, N) = max(valid_total_ratings.items(), key=lambda x: x[1][0] / x[1][1])
+            action_to_play, (W, N) = max(valid_total_ratings.items(), key=lambda x: x[1][0] / (x[1][1] + 1e-6))
             if game_state.print_info:
                 print(f'{self} expects to not lose with {W/N*100:.2f}%')
         else:
