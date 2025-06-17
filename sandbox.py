@@ -8,7 +8,7 @@ from moskaengine.players.random_player import RandomPlayer as Random
 from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
 from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
 from moskaengine.players.determinized_nn_mcts_player import DeterminizedMLPMCTS
-from moskaengine.research.model_training.train_model import CardPredictorMLP
+from moskaengine.research.model_training.train_model_2 import HandPredictMLP
 
 siemen = random.randint(0, 1000000)
 print(f"Used seed: {siemen}")
@@ -22,8 +22,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Load the model
-model_path = "moskaengine/research/model_training/card_predictor_1.pth"
-model = CardPredictorMLP(input_size=433, output_size=156)
+model_path = "moskaengine/research/model_training/model_1.pth"
+model = HandPredictMLP(input_size=433, output_size=156)
 model.load_state_dict(torch.load(model_path, map_location=device))
 
 # Note the main attacker should be specified

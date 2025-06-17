@@ -5,6 +5,7 @@ import pyarrow.parquet as pq
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from tqdm import tqdm
+from pathlib import Path
 
 # PyTorch imports
 import torch
@@ -133,8 +134,11 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, epochs=5,
 
 
 if __name__ == "__main__":
-    input_file = "../../../vectors_10k/state/states.parquet"
-    label_file = "../../../vectors_10k/opponent/opponents.parquet"
+    current_dir = Path(__file__).resolve().parent
+    parent_dir = current_dir.parent.parent.parent
+    # Define the input and label files
+    input_file = parent_dir / "vectors_1k/state/states.parquet"
+    label_file = parent_dir / "vectors_1k/opponent/opponents.parquet"
 
     # Load the dataset
     dataset = CardVectorDataset(input_file, label_file)
@@ -161,9 +165,9 @@ if __name__ == "__main__":
 
     # Train the model
     print("Training the model...")
-    train_model(model, train_loader, val_loader, criterion, optimizer, epochs=2)
+    train_model(model, train_loader, val_loader, criterion, optimizer, epochs=20)
 
     # Save the trained model
-    model_name = "model_1.pt"
+    model_name = "model_1.pth"
     torch.save(model.state_dict(), model_name)
     print(f"Model saved to: {model_name}")

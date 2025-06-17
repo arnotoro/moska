@@ -2,7 +2,7 @@ from moskaengine.players.abstract_player import AbstractPlayer
 from moskaengine.mcts.mcts import MCTS
 from moskaengine.utils.game_utils import state_as_vector
 from moskaengine.research.model_training.train_model import CardPredictorMLP
-from moskaengine.game.deck import Card
+from moskaengine.game.deck import Card, StandardDeck
 import random
 import torch
 
@@ -50,32 +50,50 @@ class DeterminizedMLPMCTS(AbstractPlayer):
         input_state_tensor = torch.tensor(input_state_vector, dtype=torch.float32).unsqueeze(0).to(self.device)
 
         # Get model predictions
+        num_opponents = len(game_state.players) - 1
         self.model.eval()
         with torch.no_grad():
             logits = self.model(input_state_tensor)
             # Apply sigmoid to get probabilities
-            probs = torch.sigmoid(logits).cpu().numpy().flatten()
+            probs = torch.sigmoid(logits).squeeze()
 
-        # Model output shape is (3*52) corresponding to cards for 3 opponents
-        num_opponents = len(game_state.players) - 1
-        probs = probs.reshape(num_opponents, 52)
+        # Reshape probabilities to match the number of opponents
+        probs = probs.view(num_opponents, 52)
 
-        # Get opponents and their hand sizes
+        # Get the number of hidden cards for each opponent
         opponents = [p for p in game_state.players if p != game_state.player_to_play]
-
-        # Track original hand sizes before clearing private cards
         original_hand_sizes = {p: len(p.hand) for p in opponents}
-
-        # Clear the private (non-public) cards from opponent hands and count how many cards are needed
         for player in opponents:
+            # Ensure each player's hand is cleared of private cards
             player.hand = [card for card in player.hand if card.is_public]
 
-        # Calculate how many cards each player needs
-        cards_needed = {p: original_hand_sizes[p] - len(p.hand) for p in opponents}
+        cards_needed_per_player = {p: original_hand_sizes[p] - len(p.hand) for p in opponents}
 
-        if game_state.print_info:
-            pass
-            # print(f"Cards needed per player: {cards_needed}")
+        print(f"Cards needed per player: {cards_needed_per_player}")
+
+        reference_deck = StandardDeck(shuffle=False, perfect_info=True)
+
+        # Compare the predicted cards with the actual cards
+        # Get n most probable cards for each opponent
+        for i in range(len(opponents)):
+            top_values, top_indices = torch.topk(probs[i], int(cards_needed_per_player[opponents[i]]))
+            print(f"Top {cards_needed_per_player[opponents[i]]} predicted cards for opponent {opponents[i]}: {top_indices.tolist()}")
+            # # Create a mask for the probabilities
+            # mask = torch.zeros_like(probs[i])
+            # mask[top_indices] = probs[i][top_indices]
+            # # Convert to binary mask (0 or 1)
+            # mask = (mask > 0).float()
+            # probs[i] = mask
+        # Convert probabilities to a list of lists for easier handling
+        probs = probs.cpu().numpy().tolist()
+        print(f"Probabilities reshaped: {probs}")
+
+        for i in range(len(opponents)):
+            print(f"Predicted cards for opponent {opponents[i]}:")
+            for j in range(52):
+                if probs[i][j] == 1:
+                    print(reference_deck.cards[j], end=", ")
+            print()  # New line after each opponent's cards
 
         # Create a mapping from card indices (0-51) to actual cards in unknown_cards list
         reference_deck = game_state.card_collection
@@ -96,16 +114,19 @@ class DeterminizedMLPMCTS(AbstractPlayer):
             if idx >= len(probs):  # Safety check
                 continue
 
-            num_cards_needed = cards_needed[player]
+            num_cards_needed = cards_needed_per_player[player]
             if num_cards_needed <= 0:
                 continue
 
             player_probs = probs[idx]
 
+            print(f"Player probs: {player_probs}")
+
             # Create pairs of (card_idx, probability)
             card_prob_pairs = [(i, prob) for i, prob in enumerate(player_probs)
                                if i in card_mapping and card_mapping[i] not in assigned_cards]
 
+            print(f"Card-probability pairs for {player.name}: {card_prob_pairs}")
             # Sort by probability (highest first)
             card_prob_pairs.sort(key=lambda x: x[1], reverse=True)
 
@@ -130,6 +151,7 @@ class DeterminizedMLPMCTS(AbstractPlayer):
 
                 # Add to player's hand
                 player.hand.append(new_card)
+                print(f"Assigned {new_card} to {player.name}")
 
                 # Mark as assigned
                 assigned_cards.add(card_to_assign)

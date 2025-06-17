@@ -8,9 +8,16 @@ __pycache__/
 
 roadmap.md
 
+
 vectors*/
 results/
 
 *.ipynb
 *.png
 *.pdf
+*.pt
+*.pth
+*.zip
+
+# Ignore MacOS system files
+.DS_Store
