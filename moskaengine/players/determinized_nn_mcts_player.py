@@ -1,17 +1,20 @@
 from moskaengine.players.abstract_player import AbstractPlayer
 from moskaengine.mcts.mcts import MCTS
 from moskaengine.utils.game_utils import state_as_vector
-from moskaengine.research.model_training.train_model import CardPredictorMLP
+from moskaengine.research.model_training.OLD_train_model import CardPredictorMLP
+from moskaengine.utils.game_utils import check_unique_game_state
 from moskaengine.game.deck import Card, StandardDeck
 import random
 import torch
+import numpy as np
+from collections import deque
 
 class DeterminizedMLPMCTS(AbstractPlayer):
     """
 
 
     """
-    def __init__(self, name, model, device, deals=10, rollouts=100, expl_rate=0.7, scoring="win_rate"):
+    def __init__(self, name, model, device, deals=1, rollouts=100, expl_rate=0.7, scoring="win_rate", scaler = None):
         super().__init__(name)
         self.name = name
         self.hand = []
@@ -22,6 +25,7 @@ class DeterminizedMLPMCTS(AbstractPlayer):
         self.expl_rate = expl_rate
         self.device = device
         self.model = model.to(self.device)
+        self.scaler = scaler # Placeholder for scaler, if used in the future
 
 
     def make_copy(self):
@@ -31,10 +35,19 @@ class DeterminizedMLPMCTS(AbstractPlayer):
 
     def determinize_with_model(self, game_state):
         """Determinize the game state using model predictions."""
-        # Make each card in our hand public
-        for card in game_state.player_to_play.hand:
-            card.is_private = False
-            card.is_public = True
+        # Make each card in our hand public and in the card collection
+        for hand_card in game_state.player_to_play.hand:
+            hand_card.is_private = False
+            hand_card.is_public = True
+
+            # Find and update the matching card in the card_collection
+            for collection_card in game_state.card_collection:
+                if collection_card.suit == hand_card.suit and collection_card.value == hand_card.value:
+                    # Make it public in the collection too
+                    collection_card.is_unknown = False
+                    collection_card.is_private = False
+                    collection_card.is_public = True
+                    break
 
         # Get unknown cards and their tuples (suit, value pairs)
         unknown_cards = list(game_state.get_non_public_cards())
@@ -42,163 +55,141 @@ class DeterminizedMLPMCTS(AbstractPlayer):
 
         # If there are no unknown cards, return the game state as is
         if not unknown_cards:
-            print("Skipping determinization: No unknown cards.")
             return game_state
 
         # Encode the current game state into input vector
         input_state_vector, _ = state_as_vector(game_state)
+
+        # If a scaler is provided, scale the input state vector
+        if self.scaler is not None:
+            # Transform to numpy array
+            input_state_vector = np.array(input_state_vector, dtype=np.float32)
+            # Find non-binary features
+            non_binary_columns = np.where((input_state_vector != 0) & (input_state_vector != 1))[0]
+            # Remove the first column (deck size) from scaling
+            non_binary_columns = non_binary_columns[non_binary_columns != 0]  # Exclude the first column
+            # Scaler is applied to non-binary features e.g. anything other than 0 or 1 values
+            values_to_scale = input_state_vector[non_binary_columns].reshape(-1, 1)  # Reshape for scaler
+
+            # Fit and transform the non-binary features
+            scaled_values = self.scaler.fit_transform(values_to_scale)
+
+            # Apply a fixed scaling to the first column (deck size)
+            normalized_deck = len(game_state.deck.cards) / 52.0 # Normalize deck size to [0, 1]
+            input_state_vector[0] = normalized_deck
+            # Flatten back to original shape
+            input_state_vector[non_binary_columns] = scaled_values.flatten()
+            # input_state_vector[non_binary_columns] = self.scaler.fit_transform(input_state_vector[non_binary_columns])
+
+        # Convert the input state vector to a tensor
         input_state_tensor = torch.tensor(input_state_vector, dtype=torch.float32).unsqueeze(0).to(self.device)
 
-        # Get model predictions
-        num_opponents = len(game_state.players) - 1
+        # Use the model to predict the probabilities of each card being in each opponent's hand
         self.model.eval()
         with torch.no_grad():
             logits = self.model(input_state_tensor)
-            # Apply sigmoid to get probabilities
+            # Apply sigmoid to get probabilities of multi-label classification
             probs = torch.sigmoid(logits).squeeze()
 
         # Reshape probabilities to match the number of opponents
+        num_opponents = len(game_state.players) - 1
         probs = probs.view(num_opponents, 52)
 
         # Get the number of hidden cards for each opponent
-        opponents = [p for p in game_state.players if p != game_state.player_to_play]
-        original_hand_sizes = {p: len(p.hand) for p in opponents}
+        opponents = [player for player in game_state.players if player != game_state.player_to_play]
+        original_hand_sizes = {player: len(player.hand) for player in opponents}
+
+        # ### DEBUG ###
+        # # Correct cards
+        # for i, player in enumerate(opponents):
+        #     print(f"Opponent {i} actual cards: {player.hand}")
+        #     print()  # New line after each opponent's cards
+        # ##################
+
+
+        # Ensure each player's hand is cleared of private cards
         for player in opponents:
-            # Ensure each player's hand is cleared of private cards
             player.hand = [card for card in player.hand if card.is_public]
 
-        cards_needed_per_player = {p: original_hand_sizes[p] - len(p.hand) for p in opponents}
+        # Remove unknown cards from the deck safely
+        remaining_deck_cards = [card for card in game_state.deck.cards if not card.is_unknown]
+        cards_removed_from_deck = len(game_state.deck.cards) - len(remaining_deck_cards)
+        game_state.deck.cards = deque(remaining_deck_cards)
 
-        print(f"Cards needed per player: {cards_needed_per_player}")
+        unknown_cards_per_player = {p: original_hand_sizes[p] - len(p.hand) for p in opponents}
 
+        # Create a reference deck to map card indices to actual cards
         reference_deck = StandardDeck(shuffle=False, perfect_info=True)
-
-        # Compare the predicted cards with the actual cards
-        # Get n most probable cards for each opponent
-        for i in range(len(opponents)):
-            top_values, top_indices = torch.topk(probs[i], int(cards_needed_per_player[opponents[i]]))
-            print(f"Top {cards_needed_per_player[opponents[i]]} predicted cards for opponent {opponents[i]}: {top_indices.tolist()}")
-            # # Create a mask for the probabilities
-            # mask = torch.zeros_like(probs[i])
-            # mask[top_indices] = probs[i][top_indices]
-            # # Convert to binary mask (0 or 1)
-            # mask = (mask > 0).float()
-            # probs[i] = mask
-        # Convert probabilities to a list of lists for easier handling
-        probs = probs.cpu().numpy().tolist()
-        print(f"Probabilities reshaped: {probs}")
-
-        for i in range(len(opponents)):
-            print(f"Predicted cards for opponent {opponents[i]}:")
-            for j in range(52):
-                if probs[i][j] == 1:
-                    print(reference_deck.cards[j], end=", ")
-            print()  # New line after each opponent's cards
-
-        # Create a mapping from card indices (0-51) to actual cards in unknown_cards list
-        reference_deck = game_state.card_collection
         card_mapping = {}
 
-        for i, ref_card in enumerate(reference_deck):
-            for unknown_card in unknown_cards:
-                if (ref_card.suit == unknown_card.suit and
-                        ref_card.value == unknown_card.value):
-                    card_mapping[i] = unknown_card
-                    break
+        for idx, card in enumerate(reference_deck.cards):
+            card_mapping[idx] = card
 
         # Assign cards to players based on probabilities
         assigned_cards = set()
 
-        # For each player, assign cards with highest probabilities
+        # For each player, assign cards with the highest probabilities
         for idx, player in enumerate(opponents):
             if idx >= len(probs):  # Safety check
                 continue
 
-            num_cards_needed = cards_needed_per_player[player]
+            num_cards_needed = unknown_cards_per_player[player]
             if num_cards_needed <= 0:
                 continue
 
-            player_probs = probs[idx]
-
-            print(f"Player probs: {player_probs}")
-
             # Create pairs of (card_idx, probability)
-            card_prob_pairs = [(i, prob) for i, prob in enumerate(player_probs)
-                               if i in card_mapping and card_mapping[i] not in assigned_cards]
+            player_probs = probs[idx]
+            card_prob_pairs = [(i, prob) for i, prob in enumerate(player_probs) if i in card_mapping]
 
-            print(f"Card-probability pairs for {player.name}: {card_prob_pairs}")
             # Sort by probability (highest first)
             card_prob_pairs.sort(key=lambda x: x[1], reverse=True)
 
-            # Assign cards to this player
-            for _ in range(min(num_cards_needed, len(card_prob_pairs))):
-                if not card_prob_pairs:
-                    break
+            # Assign cards to this player based on the probabilities
+            cards_assigned_to_player = 0
 
+            while cards_assigned_to_player < num_cards_needed and card_prob_pairs:
                 card_idx, _ = card_prob_pairs.pop(0)
                 card_to_assign = card_mapping[card_idx]
 
-                # Skip if already assigned
+                # If the card is already assigned, go to the next one
                 if card_to_assign in assigned_cards:
+                    # print(f"Card {card_to_assign} already assigned, skipping.")
                     continue
 
-                # Create a new card to avoid reference issues
-                new_card = Card()
-                new_card.from_card(card_to_assign)
-                new_card.is_public = True
-                new_card.is_private = False
-                new_card.is_unknown = False
+                elif card_to_assign in unknown_cards:
+                    # print(f"Assigning card {card_to_assign} to player {player.name}")
+                    new_card = Card()
+                    new_card.from_card(card_to_assign)
+                    new_card.is_public = True
+                    new_card.is_private = False
+                    new_card.is_unknown = False
 
-                # Add to player's hand
-                player.hand.append(new_card)
-                print(f"Assigned {new_card} to {player.name}")
+                    player.hand.append(new_card)
+                    assigned_cards.add(card_to_assign)
+                    # Remove the card from the unknown cards list
+                    unknown_cards.remove(card_to_assign)
+                    cards_assigned_to_player += 1
+                else:
+                    # If the card is public (known), skip
+                    continue
 
-                # Mark as assigned
-                assigned_cards.add(card_to_assign)
+            # print(f"Cards in player {player.name} hand after determinization: {player.hand}")
 
-        # Assign any remaining cards that weren't assigned based on probabilities
-        unassigned_cards = [card for card in unknown_cards if card not in assigned_cards]
+        # The remaining cards are randomly determinized as deck cards
+        # print(f"Unknown cards before determinization: {unknown_cards}")
+        random.shuffle(unknown_cards)
 
-        # Shuffle for randomness
-        random.shuffle(unassigned_cards)
+        # Assign the remaining unknown cards to the deck
+        for card_to_assign in unknown_cards.copy():
+            new_card = unknown_cards.pop(0)
+            new_card.from_card(card_to_assign)
+            new_card.is_public = True
+            new_card.is_private = False
+            new_card.is_unknown = False
+            # Add to the beginning of the deck
+            game_state.deck.cards.appendleft(new_card)
 
-        # Distribute remaining cards to players who still need them
-        for player in opponents:
-            cards_still_needed = original_hand_sizes[player] - len(player.hand)
-
-            for _ in range(min(cards_still_needed, len(unassigned_cards))):
-                if not unassigned_cards:
-                    break
-
-                card = unassigned_cards.pop(0)
-
-                # Create a new card to avoid reference issues
-                new_card = Card()
-                new_card.from_card(card)
-                new_card.is_public = True
-                new_card.is_private = False
-                new_card.is_unknown = False
-
-                # Add to player's hand
-                player.hand.append(new_card)
-
-                # Mark as assigned
-                assigned_cards.add(card)
-
-        # Any remaining cards stay in the deck as unknown cards
-        # But we need to assign them concrete values for the simulation
-        remaining_cards = [card for card in unknown_cards if card not in assigned_cards]
-        remaining_tuples = list(unknown_tuples)
-        random.shuffle(remaining_tuples)
-
-        for card in remaining_cards:
-            if remaining_tuples:
-                suit, value = remaining_tuples.pop(0)
-                card.from_suit_value(suit, value)
-                card.is_public = True
-                card.is_private = False
-                card.is_unknown = False
-
+        # print(f"Unknown cards after determinization: {unknown_cards}")
         return game_state
 
     def choose_action(self, game_state):
@@ -224,6 +215,7 @@ class DeterminizedMLPMCTS(AbstractPlayer):
 
             # Determinize the game state
             copied = self.determinize_with_model(copied)
+            check_unique_game_state(copied)
 
             # Search tree from previous iterations
             search_tree = game_state.player_to_play.mcts

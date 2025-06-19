@@ -1,7 +1,7 @@
 from moskaengine.game.deck import Card, suit_to_symbol, StandardDeck
-from moskaengine.utils.card_utils import choose_random
+from moskaengine.utils.card_utils import choose_random, game_action_repr
 from moskaengine.players.human_player import Human
-from moskaengine.utils.card_utils import basic_repr_game
+from moskaengine.utils.card_utils import basic_repr_game, game_action_repr
 
 import itertools
 import random
@@ -38,6 +38,7 @@ class MoskaGame:
                  do_init = True,
                  print_info = True,
                  perfect_info = False,
+                 shuffle_deck = True,
                  save_vectors = False,
                  state_folder = "game_vectors",
                  file_format = "csv",
@@ -67,11 +68,12 @@ class MoskaGame:
 
         # Initialize the deck
         self.reference_deck = StandardDeck(shuffle=False, perfect_info=True)
-        self.deck = StandardDeck(shuffle=True, perfect_info=perfect_info)
-        self.card_collection = [card.make_copy() for card in self.deck.cards]
+        self.deck = StandardDeck(shuffle=shuffle_deck, perfect_info=perfect_info)
+        self.card_collection = self.deck.copy()
 
         # Initialize
-        self.all_cards = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
+        self.all_cards_tuples = {(suit, value) for suit in range(1, 5) for value in range(2, 15)}
+        self.all_cards = [Card(value, suit) for suit in range(1, 5) for value in range(2, 15)]
 
         # Game variables
         self.cards_killed = []
@@ -92,15 +94,12 @@ class MoskaGame:
         # NOTE: Only initialized for the game state vector
         self.player_to_play = self.main_attacker
 
-
-
         # Players draw their hand
         for player in self.players:
-            player.hand = self.deck.pop(6)
+            self.deck = player.fill_hand(self.deck)
+            # player.hand = self.deck.pop(6)
 
         if computer_shuffle:
-            unknown = self.get_unknown_cards()
-
             # Draw trump card
             self.trump_card = self.deck.pop(1)[0]
             self.trump_card.is_public = True
@@ -115,34 +114,64 @@ class MoskaGame:
                     if card.suit == self.trump_card.suit and card.value == 2:
                         player.hand.remove(card)
                         player.hand.append(self.trump_card)
-                        self.deck.place_bottom(card)
 
                         if self.print_info:
                             print(f"{player} has switched the trump card ({self.trump_card}) with their 2 of trump card ({card})")
 
+                        # Make both cards public
                         card.is_public = True
                         card.is_unknown = False
                         card.is_private = False
                         self.trump_card.is_public = True
                         self.trump_card.is_unknown = False
                         self.trump_card.is_private = False
+                        self.trump_card.is_drawn = True
 
+                        # Store the previous trump card to update it in the collection
+                        previous_trump = self.trump_card
                         self.trump_card = card
+
+                        # Update the drawn card in the card collection
+                        for c in self.card_collection:
+                            if c.suit == card.suit and c.value == card.value:
+                                c.is_public = True
+                                c.is_unknown = False
+                                c.is_private = False
+                                c.is_drawn = True
+                                break
+
+                        # Update the previous trump card in the card collection
+                        for c in self.card_collection:
+                            if c.suit == previous_trump.suit and c.value == previous_trump.value:
+                                c.is_public = True
+                                c.is_unknown = False
+                                c.is_private = False
+                                c.is_drawn = False
+                                break
+            else:
+                # If no player has the 2 of trump, the card is placed at the bottom of the deck
+                for c in self.card_collection:
+                    if c.suit == self.trump_card.suit and c.value == self.trump_card.value:
+                        c.is_public = True
+                        c.is_unknown = False
+                        c.is_private = False
+                        c.is_drawn = False
                         break
+                # Place the trump card at the bottom of the deck
+                self.deck.place_bottom(self.trump_card)
         else:
             # TODO: Not implemented correctly yet
             # We must shuffle the cards irl
             print("Specify the suit and value of the trump card:")
-            self.deck[-1].from_input(self.all_cards)
+            self.deck[-1].from_input(self.all_cards_tuples)
             self.deck[-1].is_public = True
 
         # Initialize the players
-        for player in self.players:
-            # The suit and value of the card is not necessary at this point
-            # only if the player is not Human the suit and value of the card
-            # must be added whenever all possible actions are listed.
-            self.deck = player.fill_hand(self.deck)
-
+        # for player in self.players:
+        #     # The suit and value of the card is not necessary at this point
+        #     # only if the player is not Human the suit and value of the card
+        #     # must be added whenever all possible actions are listed.
+        #     self.deck = player.fill_hand(self.deck)
 
         # Initialize the attacking player
         if self.print_info:
@@ -157,6 +186,29 @@ class MoskaGame:
         # Start the game
         self.new_attack(self.main_attacker)
 
+    def make_discarded_cards_public(self, cards, drawn=False):
+        """Make the discarded cards public."""
+        for card in cards:
+            card.is_public = True
+            card.is_unknown = False
+            card.is_private = False
+            card.is_drawn = drawn
+
+        # Update the card collection
+        for c in self.card_collection:
+            if c in cards:
+                c.is_public = True
+                c.is_unknown = False
+                c.is_private = False
+                c.is_drawn = drawn
+
+        for c in self.deck:
+            if c in cards:
+                c.is_public = True
+                c.is_unknown = False
+                c.is_private = False
+                c.is_drawn = drawn
+
     def get_unknown_cards(self):
         """Returns the (suit, value) pairs of all unknown cards"""
         # remove = set()
@@ -164,7 +216,7 @@ class MoskaGame:
         #     if not card.is_unknown:
         #         remove.add((card.suit, card.value))
         remove = {(c.suit, c.value) for c in self.card_collection if not c.is_unknown}
-        return self.all_cards - remove
+        return self.all_cards_tuples - remove
 
     # def get_unknown_cards(self):
     #     """Returns the Card objects of all unknown cards"""
@@ -172,17 +224,14 @@ class MoskaGame:
     #     return unknown_cards
 
     def get_non_public_cards_tuples(self):
-        """Returns the (suit, value) pairs of all unknown cards + private cards"""
-        # remove = set()
-        # for card in self.card_collection:
-        #     if card.is_public:
-        #         remove.add((card.suit, card.value))
-        remove = {(c.suit, c.value) for c in self.card_collection if c.is_public}
-        return self.all_cards - remove
+        """Returns the (suit, value) pairs of all cards that are not public"""
+        # Using set comprehension for efficiency
+        public_cards = {(c.suit, c.value) for c in self.card_collection if c.is_public}
+        return self.all_cards_tuples - public_cards
 
     def get_non_public_cards(self):
         """Returns all Card objects that are not public."""
-        return [card for card in self.card_collection if not card.is_public]
+        return [c for c in self.card_collection if not c.is_public]
 
     # def get_non_public_cards(self):
     #     """Returns the Card objects of all non-public cards"""
@@ -257,8 +306,8 @@ class MoskaGame:
 
             # NOTE: here game is already initiated
             if self.cards_killed:
-                # There is a pair on the table, the player can pass on attacking
-                possible_actions.append(('PassAttack', None))
+                # There is a pair on the table, the player can skip on attacking
+                possible_actions.append(('Skip', None))
 
                 # If no pass, we play cards with the same values as those that are played to table
                 values_on_table = {card.value for pair in self.cards_killed for card in pair}
@@ -328,9 +377,6 @@ class MoskaGame:
             available_throws = len(self.defender.hand) - len(self.cards_to_defend)
             max_throws = min(available_throws, len(possible_throws), len(player.hand))
 
-            # Default case
-            possible_actions.append(('ThrowCards', None))
-
             # If there are cards to throw
             if max_throws > 0:
                 for throw in range(1, max_throws + 1):
@@ -341,6 +387,8 @@ class MoskaGame:
                             else:
                                 possible_actions.append(('ThrowCards', option))
 
+            # Can always skip
+            possible_actions.append(('Skip', None))
         else:
             raise ValueError(f"Unknown action {action}")
 
@@ -397,10 +445,14 @@ class MoskaGame:
                 self.cards_killed.append((defended_card, played_card))
                 self.cards_discarded.extend([defended_card, played_card])
 
+
             if not self.cards_to_defend:
                 # No more cards to defend, switch to attacking
                 self.player_to_play = self.attackers[self.current_attacker]
                 self.current_action = 'Attack'
+
+            # Make the played cards public
+            self.make_discarded_cards_public(cards_played + cards_defended)
             return
 
         elif action_type == 'PlayFromDeck':
@@ -410,13 +462,18 @@ class MoskaGame:
             kopled_card.is_unknown = kopled_card.is_private = False
             card_to_defend = action[1][1]
 
-            # If the kopled card can't defend a card on the table, it must be added to the cards_to_defend
             if card_to_defend and card_to_defend in self.cards_to_defend:
+                # Kopled card can defend a card on the table
                 self.cards_to_defend.remove(card_to_defend)
                 self.cards_killed.append((card_to_defend, kopled_card))
                 self.cards_discarded.extend([kopled_card, card_to_defend])
+                # Make the played cards public
+                self.make_discarded_cards_public([kopled_card, card_to_defend])
             else:
+                # If the kopled card can't defend a card on the table, it is added to the cards_to_defend
                 self.cards_to_defend.append(kopled_card)
+                # Make the kopled card public even if it can't defend
+                self.make_discarded_cards_public([kopled_card])
 
             # If all the cards are defended, the game continues accordingly
             if not self.cards_to_defend:
@@ -435,57 +492,62 @@ class MoskaGame:
             self.attacker_to_start_throwing = self.current_attacker
             return
 
-        if action_type == 'ThrowCards':
+        elif action_type == 'ThrowCards':
             # PlayToOther i.e., play to table for the defender to fall
-            if action[1] is not None:
-                if len(action[1]) == 1:
-                    card_played = self.player_to_play.discard_card(self, action[1].suit, action[1].value)
-                    self.cards_to_defend.append(card_played)
-                else:
-                    for card in action[1]:
-                        card_played = self.player_to_play.discard_card(self, card.suit, card.value)
-                        self.cards_to_defend.append(card_played)
-
-                # Give the defender a new chance if cards changed
-                self.last_played_attacker = self.player_to_play
-                self.player_to_play = self.defender
-                self.current_action = 'Defend'
+            if len(action[1]) == 1:
+                card_played = self.player_to_play.discard_card(self, action[1].suit, action[1].value)
+                self.cards_to_defend.append(card_played)
             else:
-                # Increment attacker and player to play
-                self.current_attacker = (self.current_attacker + 1) % len(self.attackers)
-                self.player_to_play = self.attackers[self.current_attacker]
+                for card in action[1]:
+                    card_played = self.player_to_play.discard_card(self, card.suit, card.value)
+                    self.cards_to_defend.append(card_played)
 
-            # Check if everybody got a chance to throw
-            if self.player_to_play == self.attackers[self.attacker_to_start_throwing]:
-                if self.draw_undefended:
-                    # The defender takes the non-defended cards, and the new main attacker is the one to the left of the defender
-                    self.defender.hand.extend(self.cards_to_defend)
-                    self.draw_undefended = False
-                else:
-                    all_on_table = [card for pair in self.cards_killed for card in pair] + self.cards_to_defend
-                    self.defender.hand.extend(all_on_table)
+            # Make the played cards public
+            self.make_discarded_cards_public(self.cards_to_defend[-len(action[1]):])
 
-                for player in self.draw_order:
-                    self.deck = player.fill_hand(self.deck)
+            # Give the defender a new chance if cards changed
+            self.last_played_attacker = self.player_to_play
+            self.player_to_play = self.defender
+            self.current_action = 'Defend'
 
-                # Defender takes the cards and the new main attacker is the one to the left of the defender
-                self.new_attack(self.attackers[1 % len(self.attackers)])
-            return
-
-        elif action_type == 'PassAttack':
-            # Pass on attacking i.e. skip
+        elif action_type == 'Skip':
+            # Increment attacker and player to play
             self.current_attacker = (self.current_attacker + 1) % len(self.attackers)
             self.player_to_play = self.attackers[self.current_attacker]
 
-            # Check if no one wants to attack
-            if self.player_to_play == self.last_played_attacker:
-                # The defender defended successfully
-                for player in self.draw_order:
-                    self.deck = player.fill_hand(self.deck)
+            # If there are cards on the table, the defender must pick them up
+            if self.cards_to_defend:
+                # Check if everybody got a chance to throw
+                if self.player_to_play == self.attackers[self.attacker_to_start_throwing]:
+                    if self.draw_undefended:
+                        # NOTE: The defender picks up the cards here.
+                        # The defender takes the non-defended cards, and the new main attacker is the one to the left of the defender
+                        self.defender.hand.extend(self.cards_to_defend)
+                        self.draw_undefended = False
+                        # Make the drawn cards public
+                        self.make_discarded_cards_public(self.cards_to_defend, drawn=True)
+                    else:
+                        all_on_table = [card for pair in self.cards_killed for card in pair] + self.cards_to_defend
+                        self.defender.hand.extend(all_on_table)
+                        # Make the drawn cards public
+                        self.make_discarded_cards_public(all_on_table, drawn=True)
 
-                assert not self.cards_to_defend
-                self.new_attack(self.defender)
-            return
+                    for player in self.draw_order:
+                        self.deck = player.fill_hand(self.deck)
+
+                    # Defender takes the cards and the new main attacker is the one to the left of the defender
+                    self.new_attack(self.attackers[1 % len(self.attackers)])
+                return
+            else:
+                # Check if no one wants to attack
+                if self.player_to_play == self.last_played_attacker:
+                    # The defender defended successfully
+                    for player in self.draw_order:
+                        self.deck = player.fill_hand(self.deck)
+
+                    assert not self.cards_to_defend
+                    self.new_attack(self.defender)
+                    return
         else:
             raise NotImplementedError('Action to execute not implemented.')
 
@@ -500,18 +562,23 @@ class MoskaGame:
     #         player_ids[id(pl)] = copy_pl
     #         new.players.append(copy_pl)
     #
-    #     card_ids = {}
-    #     # Helper function to copy a list of cards and update card_ids
-    #     def get_copied_card(card):
-    #         if card is None:
-    #             return None
-    #         card_id = id(card)
-    #         if card_id not in card_ids:
-    #             copy_card = card.make_copy()
-    #             card_ids[card_id] = copy_card
-    #             return copy_card
-    #         return card_ids[card_id]
+    #     # Copy player_ids mapping from old players to new players
+    #     new.player_ids = {player_ids[id(pl)]: idx for pl, idx in self.player_ids.items()}
     #
+    #     new.deck = StandardDeck(shuffle=False, perfect_info=self.perfect_info)
+    #     new.deck.cards = deque(card.make_copy() for card in self.deck.cards)
+    #     new.cards_to_defend = [card.make_copy() for card in self.cards_to_defend]
+    #     new.cards_killed = [(card[0].make_copy(), card[1].make_copy()) for card in self.cards_killed]
+    #     new.cards_discarded = [card.make_copy() for card in self.cards_discarded]
+    #     new.trump_card = self.trump_card.make_copy()
+    #     new.all_cards_tuples = self.all_cards_tuples
+    #     new.all_cards = self.all_cards
+    #     new.card_collection = []
+    #     card_ids = {}
+    #     for card in self.card_collection:
+    #         copy_card = card.make_copy()
+    #         card_ids[id(card)] = copy_card
+    #         new.card_collection.append(copy_card)
     #
     #     new.attackers = [player_ids[id(p)] for p in self.attackers]
     #     new.defender = player_ids.get(id(self.defender), None)
@@ -524,84 +591,73 @@ class MoskaGame:
     #     new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
     #     new.loser = player_ids.get(id(self.loser), None)
     #
-    #     # General game attributes
-    #     new.computer_shuffle = self.computer_shuffle
-    #     new.print_info = False
-    #     new.perfect_info = self.perfect_info
     #     new.n_turns = self.n_turns
-    #     new.debug = False
-    #     new.is_end_state = self.is_end_state
+    #     new.perfect_info = self.perfect_info
     #
-    #     # Data saving attributes
+    #     # History
     #     new.history = self.history.copy()
-    #     new.state_data = self.state_data.copy()
-    #     new.opponent_data = self.opponent_data.copy()
-    #     new.save_vectors = self.save_vectors
-    #     new.state_folder = self.state_folder
-    #     new.file_format = self.file_format
-    #
-    #     # Copy deck and card collection
-    #     new_deck_cards = [get_copied_card(card) for card in self.deck.cards]
-    #     new.deck = StandardDeck(shuffle=False, perfect_info=self.perfect_info)
-    #     new.deck.cards = deque(new_deck_cards)
-    #     new.card_collection = [get_copied_card(card) for card in self.card_collection]
-    #     new.reference_deck = self.reference_deck
-    #     new.trump_card = get_copied_card(self.trump_card)
-    #     new.all_cards = self.all_cards  # Assuming no direct mutable Card objects
-    #
-    #     # Copy lists of cards using get_copied_card
-    #     new.cards_killed = [(get_copied_card(p[0]), get_copied_card(p[1])) for p in self.cards_killed]
-    #     new.cards_to_defend = [get_copied_card(card) for card in self.cards_to_defend]
-    #     new.cards_discarded = [get_copied_card(card) for card in self.cards_discarded]
-    #
-    #     # Copy players' hands
-    #     for idx, player in enumerate(self.players):
-    #         new.players[idx].hand = [get_copied_card(c) for c in player.hand]
     #
     #     return new
 
     def clone_for_rollout(self):
         new = MoskaGame(None, False, None, False, False)
 
-        # Copy players and related attributes
+        # Copy players and build player_ids mapping
         new.players = []
         player_ids = {}
+
         for pl in self.players:
             copy_pl = pl.make_copy()
             player_ids[id(pl)] = copy_pl
             new.players.append(copy_pl)
 
-        # Copy player_ids mapping from old players to new players
+        # Direct dictionary update for player_ids
         new.player_ids = {player_ids[id(pl)]: idx for pl, idx in self.player_ids.items()}
 
         new.deck = StandardDeck(shuffle=False, perfect_info=self.perfect_info)
         new.deck.cards = deque(card.make_copy() for card in self.deck.cards)
+
+        # Copy card lists
         new.cards_to_defend = [card.make_copy() for card in self.cards_to_defend]
         new.cards_killed = [(card[0].make_copy(), card[1].make_copy()) for card in self.cards_killed]
         new.cards_discarded = [card.make_copy() for card in self.cards_discarded]
+
+        # Copy trump card
         new.trump_card = self.trump_card.make_copy()
-        new.card_collection = self.card_collection
+
+        # Direct references for simple collections
+        new.all_cards_tuples = self.all_cards_tuples
         new.all_cards = self.all_cards
 
+        # Copy card collection
+        new.card_collection = [card.make_copy() for card in self.card_collection]
+
+        # Copy simple player references using player_ids mapping
         new.attackers = [player_ids[id(p)] for p in self.attackers]
         new.defender = player_ids.get(id(self.defender), None)
-        new.current_attacker = self.current_attacker
-        new.current_action = self.current_action
-        new.draw_undefended = self.draw_undefended
         new.draw_order = [player_ids[id(p)] for p in self.draw_order]
         new.player_to_play = player_ids[id(self.player_to_play)]
-        new.attacker_to_start_throwing = self.attacker_to_start_throwing
         new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
         new.loser = player_ids.get(id(self.loser), None)
 
-        new.n_turns = self.n_turns
-        new.perfect_info = self.perfect_info
+        # Copy other attributes
+        attrs_to_copy = [
+            'current_attacker', 'current_action', 'draw_undefended', 'attacker_to_start_throwing', 'n_turns', 'perfect_info'
+        ]
+        for attr in attrs_to_copy:
+            setattr(new, attr, getattr(self, attr))
 
-        # History
+        # Copy the history
         new.history = self.history.copy()
 
         return new
 
+    # def clone_for_rollout(self):
+    # Old version with deepcopy (DEBUG PURPOSES)
+    #     from copy import deepcopy
+    #     new = deepcopy(self)
+    #     new.print_info = False
+    #     return new
 
     def next(self):
         """Chooses and performs an action/move"""
@@ -620,22 +676,10 @@ class MoskaGame:
 
         # Display the action
         if self.print_info or not self.computer_shuffle:
-            action_type = action[0]
-            if action_type == 'Attack' or action_type == 'Defend':
-                # Check if action[1] is a list of tuples (multiple cards) or a single tuple
-                if len(action[1]) > 1:
-                    print(f"{self.player_to_play} plays {action_type} with cards {action[1]}\n")
-                else:
-                    print(f"{self.player_to_play} plays {action_type} with card {action[1]}\n")
-            # elif action_type == 'Defend':
-            #     for i in enumerate(action[1][0]):
-            #         print(f"{self.player_to_play} defends card {action[1][0][i]} with {action[1][1][i]}\n")
-            elif action_type == 'ThrowCards':
-                print(f'Action {action_type} with {action[1]} was chosen by {self.player_to_play}\n')
-            elif action_type == 'PlayFromDeck':
-                print(f"Action {action_type} was chosen by {self.player_to_play} and the drawn card was {action[1][0]}\n")
-            else:
-                print(f'Action {action} was chosen by {self.player_to_play}\n')
+            # Print the game state for computer players
+            if not isinstance(self.player_to_play, Human):
+                print(basic_repr_game(self))
+            print(game_action_repr(self.player_to_play, action))
 
         # Execute the action
         self.execute_action(action)

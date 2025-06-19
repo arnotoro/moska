@@ -22,21 +22,22 @@ class Card:
 
     Can be unknown to all, private to holder or public to all.
     """
-    suit = None
-    value = None
-    trump_suit = None
-    kopled = False
+    __slots__ = ('value', 'suit', 'is_drawn', 'is_public', 'is_private', 'is_unknown', 'kopled')
+    # suit = None
+    # value = None
+    # is_drawn = None
+    # kopled = False
 
-    # Always one of the following is true
-    is_public = False # Does everyone know the card
-    is_private = False # Does the holder know the card
-    is_unknown = True # Does no one know the card
+    # # Always one of the following is true
+    # is_public = False # Does everyone know the card
+    # is_private = False # Does the holder know the card
+    # is_unknown = True # Does no one know the card
 
-    def __init__(self, value=None, suit=None, kopled = False, trump_suit = None):
+    def __init__(self, value=None, suit=None, kopled = False):
         self.value = value
         self.suit = suit
         self.kopled = kopled
-        self.trump_suit = trump_suit
+        self.is_drawn = False
         self.is_public = False
         self.is_private = False
         self.is_unknown = True
@@ -63,14 +64,13 @@ class Card:
     def __str__(self):
         return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
 
-    def reset(self, suit=None, value=None, trump_suit=None):
+    def reset(self, suit=None, value=None):
         """Reset values or make unknown (useful for keeping same memory address)"""
         # Keeping the same memory address is adamant for this program
         # (not only the copy) as otherwise self.card_collection would
         # not be a collection of the cards anymore.
         self.suit = None
         self.value = None
-        self.trump_suit = None
         self.is_public = False
         self.is_private = False
         self.is_unknown = True
@@ -80,16 +80,22 @@ class Card:
         new = Card()
         new.value = self.value
         new.suit = self.suit
-        new.trump_suit = self.trump_suit
+        new.is_drawn = self.is_drawn
         new.is_public = self.is_public
         new.is_private = self.is_private
         new.is_unknown = self.is_unknown
         new.kopled = self.kopled
         return new
-
-    def is_trump(self):
-        """Checks if the current card is a trump card or not"""
-        return self.suit == self.trump_suit
+        # new_card = Card(
+        #     value=self.value,
+        #     suit=self.suit,
+        #     kopled=self.kopled
+        # )
+        # new_card.is_drawn = self.is_drawn
+        # new_card.is_public = self.is_public
+        # new_card.is_private = self.is_private
+        # new_card.is_unknown = self.is_unknown
+        # return new_card
 
     def from_input(self, possible):
         """Get the suit and value of the card from the input
@@ -182,10 +188,9 @@ class StandardDeck:
 
         for _ in range(min(len(self), n)):
             card = self.cards.popleft()
-            # Make cards known to the player
-            card.is_unknown = False
-            card.is_private = True
-            card.is_public = False
+            # card.is_unknown = True
+            # card.is_private = False
+            # card.is_public = False
             hand.append(card)
 
         # hand = [self.cards.popleft() for _ in range(min(len(self), n))]

@@ -1,6 +1,11 @@
 from moskaengine.players.abstract_player import AbstractPlayer
 from moskaengine.mcts.mcts import MCTS
+from moskaengine.game.deck import Card
 import random
+from collections import deque
+
+from moskaengine.utils.game_utils import check_unique_game_state
+
 
 class DeterminizedMCTS(AbstractPlayer):
     """
@@ -22,33 +27,125 @@ class DeterminizedMCTS(AbstractPlayer):
         new = DeterminizedMCTS(self.name)
         new.hand = self.hand.copy()
         return new
+    #
+    # def randomly_determinize(self, game_state):
+    #     """Randomly determinize the game state to a deterministic state."""
+    #
+    #     # Make each card in our hand public
+    #     for hand_card in game_state.player_to_play.hand:
+    #         hand_card.is_private = False
+    #         hand_card.is_public = True
+    #
+    #         # Update corresponding card in card collection
+    #         for collection_card in game_state.card_collection:
+    #             if collection_card.suit == hand_card.suit and collection_card.value == hand_card.value:
+    #                 collection_card.is_unknown = False
+    #                 collection_card.is_private = False
+    #                 collection_card.is_public = True
+    #                 break
+    #
+    #     # Get unknown cards as (suit, value) tuples and shuffle them
+    #     unknown_tuples = list(game_state.get_non_public_cards_tuples())
+    #     assert len(unknown_tuples) >= len([c for c in game_state.card_collection if c.is_unknown])
+    #
+    #     random.shuffle(unknown_tuples)
+    #
+    #     # Determinize unknown cards in card_collection
+    #     for card in game_state.card_collection:
+    #         if card.is_unknown:
+    #             suit, value = unknown_tuples.pop(0)
+    #             card.from_suit_value(suit, value)
+    #             card.is_public = True
+    #             card.is_unknown = False
+    #             card.is_private = False
+    #
+    #             # Also update elsewhere in the game state
+    #             game_state.make_discarded_cards_public([card])
+    #
+    #         elif card.is_private:
+    #             # If the card is private, we keep it unknown to us
+    #             suit, value = unknown_tuples.pop(0)
+    #             card.from_suit_value(suit, value)
+    #             card.is_public = True
+    #             card.is_unknown = True
+    #             card.is_private = False
+    #
+    #             for player in game_state.players:
+    #                 if player.name == game_state.player_to_play.name:
+    #                     continue
+    #                 for c in player.hand:
+    #                     # If the card is in the player's hand, we make it unknown
+    #                     if c.suit == card.suit and c.value == card.value:
+    #                         c.is_unknown = True
+    #                         c.is_private = False
+    #                         c.is_public = True
+    #     return game_state
 
     def randomly_determinize(self, game_state):
-        """Randomly determinize the game state to a deterministic state."""
+        """Determinize the game state by randomly assigning unknown cards to players."""
 
         # Make each card in our hand public
-        for card in game_state.player_to_play.hand:
-            card.is_private = False
-            card.is_public = True
+        for hand_card in game_state.player_to_play.hand:
+            hand_card.is_private = False
+            hand_card.is_public = True
 
-        # Unknown cards are shuffled
-        unknown_tuples = list(game_state.get_non_public_cards_tuples())
-        random.shuffle(unknown_tuples)
+            # Update matching card in card_collection
+            for collection_card in game_state.card_collection:
+                if collection_card.suit == hand_card.suit and collection_card.value == hand_card.value:
+                    collection_card.is_unknown = False
+                    collection_card.is_private = False
+                    collection_card.is_public = True
+                    break
 
-        # Define the unknown cards in the card collection as random cards
-        for card in game_state.card_collection:
-            if card.is_unknown:
-                # Case: Cards that are originally unknown
-                suit, value = unknown_tuples.pop(0)
-                card.from_suit_value(suit, value)
-                card.is_public = True
-            elif card.is_private:
-                # Case: Cards that were private (in opponents hands)
-                suit, value = unknown_tuples.pop(0)
-                card.is_private = False
-                card.is_unknown = True
-                card.from_suit_value(suit, value)
-                card.is_public = True
+        # Get unknown cards
+        unknown_cards = list(game_state.get_non_public_cards())
+        if not unknown_cards:
+            return game_state  # Nothing to assign
+
+        # Identify opponents and their needed card counts
+        opponents = [player for player in game_state.players if player != game_state.player_to_play]
+        original_hand_sizes = {player: len(player.hand) for player in opponents}
+
+        # Remove any private cards from opponent hands (if any)
+        for player in opponents:
+            player.hand = [card for card in player.hand if card.is_public]
+
+        # Remove unknown cards from the deck safely
+        remaining_deck_cards = [card for card in game_state.deck.cards if not card.is_unknown]
+        cards_removed_from_deck = len(game_state.deck.cards) - len(remaining_deck_cards)
+        game_state.deck.cards = deque(remaining_deck_cards)
+
+        unknown_cards_per_player = {
+            player: original_hand_sizes[player] - len(player.hand)
+            for player in opponents
+        }
+
+        # Shuffle unknown cards for random assignment
+        random.shuffle(unknown_cards)
+
+        # Assign cards randomly to opponents
+        for player in opponents:
+            num_needed = unknown_cards_per_player[player]
+            for _ in range(num_needed):
+                if not unknown_cards:
+                    break
+                card_to_assign = unknown_cards.pop(0)
+                new_card = Card()
+                new_card.from_card(card_to_assign)
+                new_card.is_public = True
+                new_card.is_private = False
+                new_card.is_unknown = False
+                player.hand.append(new_card)
+
+        # All of the remaining unknown cards go to the deck
+        for card_to_assign in unknown_cards.copy():
+            new_card = unknown_cards.pop(0)
+            new_card.from_card(card_to_assign)
+            new_card.is_public = True
+            new_card.is_private = False
+            new_card.is_unknown = False
+            # Add to the beginning of the deck
+            game_state.deck.cards.appendleft(new_card)
 
         return game_state
 
@@ -75,7 +172,9 @@ class DeterminizedMCTS(AbstractPlayer):
 
             # Determinize the game state
             copied = self.randomly_determinize(copied)
-            # TODO: This messes up the allowed actions
+
+            # Check uniqueness of the determinized state
+            check_unique_game_state(copied)
 
             # Search tree from previous iterations
             search_tree = game_state.player_to_play.mcts
@@ -105,16 +204,21 @@ class DeterminizedMCTS(AbstractPlayer):
             if game_state.print_info:
                 print(f'{self} expects to not lose with {N} visits')
         elif self.scoring == "win_rate":
-            action_to_play, (W, N) = max(valid_total_ratings.items(), key=lambda x: x[1][0] / (x[1][1] + 1e-6))
+            action_to_play, (W, N) = max(valid_total_ratings.items(), key=lambda x: x[1][0] / x[1][1])
             if game_state.print_info:
                 print(f'{self} expects to not lose with {W/N*100:.2f}%')
         else:
             raise BaseException('Scoring type not implemented.')
 
-        self.mcts = search_tree
+        # Not needed
+        # self.mcts = search_tree
 
         # assert action_to_play in game_state.allowed_plays(), f"Action {action_to_play} not allowed in {game_state.allowed_plays()}"
 
+        # Make own cards private again
+        for card in game_state.player_to_play.hand:
+            if card.is_public:
+                card.is_private = True
+                card.is_public = False
+
         return action_to_play
-
-

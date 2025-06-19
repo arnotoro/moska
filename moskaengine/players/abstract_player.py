@@ -28,14 +28,16 @@ class AbstractPlayer(ABC):
             
             # Otherwise, draw the cards
             card_drawn = deck.pop(1)[0]
+            card_drawn.is_private = True
+            card_drawn.is_public = False
+            card_drawn.is_unknown = False
             self.hand.append(card_drawn)
 
         return deck
     
     def make_cards_known(self, game_state):
-        """Make the cards in the hand known to the player"""
+        """Makes the cards in the players hand not unknown"""
         for card in self.hand:
-
             # All cards must be unknown
             if card.is_unknown:
                 unknown = game_state.get_unknown_cards()
@@ -63,6 +65,7 @@ class AbstractPlayer(ABC):
         # TODO: Comment this
         for idx, card in enumerate(self.hand):
             if card.is_unknown:
+                non_public_cards = game_state.get_non_public_cards_tuples()
                 if (suit, value) in game_state.get_non_public_cards_tuples():
                     if (suit, value) not in [(c.suit, c.value) for c in self.hand if not c.is_unknown]:
                         card.suit = suit

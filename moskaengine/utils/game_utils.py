@@ -67,7 +67,7 @@ def _game_state_as_vector(game_state):
         "Defend": 2,
         "PlayFromDeck": 3,
         "ThrowCards": 4,
-        "PassAttack": 5,
+        "Skip": 5,
         "TakeDefend": 6,
         "TakeAll": 7,
     }
@@ -98,7 +98,7 @@ def _game_state_as_vector(game_state):
     # Move history for the last N turns, default 5
     player_indices = {pl.name: idx + 1 for idx, pl in enumerate(game_state.players)}
 
-    history_len = 2 + 52
+    history_len = 2 + 52 # action_type, player_idx + 52 cards
     turn_history = deque([[0] * history_len for _ in range(game_state.N_HISTORY)], maxlen=game_state.N_HISTORY)
 
     # The last N turns
@@ -178,3 +178,25 @@ def _create_folders(root_folder, folder_name):
 def get_project_root():
     # This function calculates the absolute path to the root of the project folder
     return Path(__file__).parent.parent.parent
+
+def check_unique_game_state(game_state):
+    """Check that all cards in the game state (players' hands + deck) are unique."""
+    all_cards = []
+
+    # Collect cards from all players' hands
+    for player in game_state.players:
+        all_cards.extend(player.hand)
+
+    # Collect cards from the deck
+    all_cards.extend(game_state.deck.cards)
+
+    # Build a set of (suit, value) pairs
+    card_tuples = [(card.suit, card.value) for card in all_cards]
+
+    # Check for duplicates
+    if len(card_tuples) != len(set(card_tuples)):
+        # Find which cards are duplicated (optional)
+        from collections import Counter
+        counts = Counter(card_tuples)
+        duplicates = [card for card, count in counts.items() if count > 1]
+        raise ValueError(f"Duplicate cards found: {duplicates}")

@@ -1,6 +1,6 @@
 from sympy.printing.pytorch import torch
 
-from moskaengine.research.model_training.train_model import CardPredictorCNN, evaluate, load_and_prepare_data
+from moskaengine.research.model_training.OLD_train_model import CardPredictorCNN, evaluate, load_and_prepare_data
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

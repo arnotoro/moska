@@ -1,6 +1,10 @@
 # Global imports
 import time
+import uuid
+import csv
 import random
+import torch
+import math
 from multiprocessing import Pool, cpu_count, Queue, Process
 from functools import partial
 
@@ -8,32 +12,42 @@ from functools import partial
 from moskaengine.game.engine import MoskaGame
 # Players
 from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
+from moskaengine.players.determinized_nn_mcts_player import DeterminizedMLPMCTS
 from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
-from moskaengine.players.random_player import RandomPlayer as Random
+# Model
+from moskaengine.research.model_training.train_model import HandPredictMLP
 
-def run_simulation(players_list, random_seed):
+def run_simulation(random_seed):
     random.seed(random_seed + random.randint(0, 1000000))
     computer_shuffle = True
-    game = MoskaGame(players_list, computer_shuffle, save_vectors=False, print_info=False)
+
+    # Load the model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_path = "model_training/model_1.pth"
+    model = HandPredictMLP(input_size=433, output_size=156)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+
+    players = [Heuristic('H1'), Heuristic('H2'), Heuristic('H3'),
+               DeterminizedMLPMCTS("NNMCTS", model, device, rollouts=100, expl_rate=0.7, scoring="win_rate")]
+
+    game = MoskaGame(players, computer_shuffle, save_vectors=False, print_info=True)
+
     while not game.is_end_state:
         game.next()
+
     return str(game.loser).replace('Player ', ''), game.state_data, game.opponent_data
 
 if __name__ == '__main__':
-    total_games = 500
-    print_every = 10
+    total_games = 1
+    print_every = 1
     start_time = time.time()
 
-    # players = [Random('Random1'), Random('Random2'), Random('Random3'), DeterminizedMCTS('MCTS_reference', deals=3, rollouts=100, expl_rate=0.7, scoring="win_rate")]
-    players = [Heuristic('H1'), Heuristic('H2'), Heuristic('H3'), DeterminizedMCTS('MCTS_reference', deals=3, rollouts=100, expl_rate=0.7, scoring="win_rate")]
-
-    losses = {player.name: 0 for player in players}
+    player_names = ['H1', 'H2', 'H3', 'NNMCTS']
+    losses = {name: 0 for name in player_names}
+    completed = 0
 
     with Pool(processes=cpu_count()) as pool:
-        completed = 0
-        run_func = partial(run_simulation, players)
-
-        for loser_name, state_data, opponent_data in pool.imap_unordered(run_func, range(total_games)):
+        for loser_name, state_data, opponent_data in pool.imap_unordered(run_simulation, range(total_games)):
             losses[loser_name] += 1
             completed += 1
 

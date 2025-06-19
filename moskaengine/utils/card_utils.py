@@ -32,7 +32,8 @@ def choose_random_action(poss_actions):
 def basic_repr_game(game_state):
     """Returns a basic representation of the game state"""
     # print("Hello from card_utils")
-    string = f"Trump card: {game_state.trump_card}\n"
+    string = f"\nPlayer to play: {game_state.player_to_play.name}\n"
+    string += f"Trump card: {game_state.trump_card}\n"
     string += f"Deck left: {len(game_state.deck)}\n"
     for pl in game_state.players:
         string += f"{pl.name}{' (TG)' if pl is game_state.defender else ''}"
@@ -61,15 +62,38 @@ def basic_repr_game(game_state):
     return string
 
 def basic_repr_player_actions(action_types, player):
-    """Returns a basic representation of the player actions"""
+    """Returns a basic representation of the current player actions. Used in player class."""
     string = f"Allowed actions for {player}:\n"
     n = 1
-    # Sort actions
-    for i in sorted(action_types):
-        if i in ['Attack', 'Defend', 'Reflect', 'ReflectTrump']:
-            string += f"{n}. {str(i)}\n"
-        else:
-            string += f"{n}. {str(i)}\n"
+
+    for i in action_types:
+        string += f"{n}. {str(i)}\n"
         n += 1
 
     return string
+
+def game_action_repr(player_to_play, action):
+    """Returns a basic representation of the played action. Used in engine."""
+    action_type = action[0]
+
+    if action_type == "Attack":
+        # Check if the action is a list of tuples (multiple cards) or a single tuple
+        if len(action[1]) > 1:
+            return f"Player {player_to_play.name} chose action: '{action_type}' with cards {', '.join(str(card) for card in action[1])}"
+        else:
+            return f"Player {player_to_play.name} chose action: '{action_type}' with card {action[1]}"
+    elif action_type == "Defend":
+        if len(action[1]) > 2:
+            return f"Player {player_to_play.name} chose action: '{action_type}' to defend cards {action[1][0]} with cards {', '.join(str(card) for card in action[1][1:])}"
+        else:
+            return f"Player {player_to_play.name} chose action: '{action_type}' to defend card {action[1][1]} with card {action[1][0]}"
+    elif action_type == "ThrowCards":
+            return f"Player {player_to_play.name} chose action: '{action_type}' with cards {action[1]}"
+    elif action_type == "PlayFromDeck":
+        return f"Player {player_to_play.name} chose action: '{action_type}' and the drawn card was {action[1][0]}"
+    elif action_type == "TakeDefend":
+        return f"Player {player_to_play.name} chose action: '{action_type}' to lift all non-defended cards from the table"
+    elif action_type == "TakeAll":
+        return f"Player {player_to_play.name} chose action: '{action_type}' to lift all the cards from the table"
+    else:
+        return f"Player {player_to_play.name} chose action: '{action_type}'"

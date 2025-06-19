@@ -1,7 +1,7 @@
 from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
 from moskaengine.players.random_player import RandomPlayer as Random
 from moskaengine.players.determinized_nn_mcts_player import DeterminizedMLPMCTS
-from moskaengine.research.model_training.train_model import CardPredictorMLP
+from moskaengine.research.model_training.OLD_train_model import CardPredictorMLP
 from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
 from moskaengine.game.engine import MoskaGame
 import os

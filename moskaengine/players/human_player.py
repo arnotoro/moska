@@ -25,15 +25,18 @@ class Human(AbstractPlayer):
 
         ### Choose action from allowed actions
         action_types = {action[0] for action in allowed_actions}
+        # Sort actions
+        action_types = sorted(action_types)
+        if 'Skip' in action_types:
+            action_types.remove('Skip')
+            action_types.append('Skip')
+
         # Print the game state
         print(basic_repr_game(game_state))
 
         # Print the allowed actions
         print(basic_repr_player_actions(action_types, self))
-
         print(f'What does {self} do?')
-
-        action_types = sorted(action_types)
 
         # Ask the user to choose an action
         while True:
@@ -60,7 +63,7 @@ class Human(AbstractPlayer):
 
         # Check if the action type is 'ThrowCards' and there is only one choice i.e. no card to throw
         # NOTE: Very unintuitive...
-        if len(choices) == 1 and action_type == 'ThrowCards':
+        if len(choices) == 1 and action_type == 'Skip':
             return action_type, choices[0]
 
         if action_type == 'Attack':
@@ -101,7 +104,7 @@ class Human(AbstractPlayer):
         elif action_type == 'Defend':
             while True:
                 # Get the input from user
-                move_input = input(f"Enter the card pair(s) indexes for {action_type} as tuples separated by space. (played_card,card_on_table): ")
+                move_input = input(f"Enter the card pair(s) indexes for {action_type} as tuples separated by space. (card_to_play, card_on_table): ")
 
                 # Parse the input
                 try:
@@ -194,7 +197,7 @@ class Human(AbstractPlayer):
                     print("Invalid input, please enter the index of the card you want to kill.\n")
 
 
-        elif action_type in ['TakeAll', 'TakeDefend', 'PassAttack']:
+        elif action_type in ['TakeAll', 'TakeDefend', 'Skip']:
             return action_type, None
 
         elif action_type == 'ThrowCards':

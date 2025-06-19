@@ -1,5 +1,5 @@
 import torch
-from moskaengine.research.model_training.train_model_2 import HandPredictMLP
+from moskaengine.research.model_training.train_model import HandPredictMLP
 import pandas as pd
 from pathlib import Path
 from moskaengine.game.deck import StandardDeck
