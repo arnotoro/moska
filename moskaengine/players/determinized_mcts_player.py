@@ -3,7 +3,6 @@ from moskaengine.mcts.mcts import MCTS
 from moskaengine.game.deck import Card
 import random
 from collections import deque
-
 from moskaengine.utils.game_utils import check_unique_game_state
 
 
@@ -27,59 +26,6 @@ class DeterminizedMCTS(AbstractPlayer):
         new = DeterminizedMCTS(self.name)
         new.hand = self.hand.copy()
         return new
-    #
-    # def randomly_determinize(self, game_state):
-    #     """Randomly determinize the game state to a deterministic state."""
-    #
-    #     # Make each card in our hand public
-    #     for hand_card in game_state.player_to_play.hand:
-    #         hand_card.is_private = False
-    #         hand_card.is_public = True
-    #
-    #         # Update corresponding card in card collection
-    #         for collection_card in game_state.card_collection:
-    #             if collection_card.suit == hand_card.suit and collection_card.value == hand_card.value:
-    #                 collection_card.is_unknown = False
-    #                 collection_card.is_private = False
-    #                 collection_card.is_public = True
-    #                 break
-    #
-    #     # Get unknown cards as (suit, value) tuples and shuffle them
-    #     unknown_tuples = list(game_state.get_non_public_cards_tuples())
-    #     assert len(unknown_tuples) >= len([c for c in game_state.card_collection if c.is_unknown])
-    #
-    #     random.shuffle(unknown_tuples)
-    #
-    #     # Determinize unknown cards in card_collection
-    #     for card in game_state.card_collection:
-    #         if card.is_unknown:
-    #             suit, value = unknown_tuples.pop(0)
-    #             card.from_suit_value(suit, value)
-    #             card.is_public = True
-    #             card.is_unknown = False
-    #             card.is_private = False
-    #
-    #             # Also update elsewhere in the game state
-    #             game_state.make_discarded_cards_public([card])
-    #
-    #         elif card.is_private:
-    #             # If the card is private, we keep it unknown to us
-    #             suit, value = unknown_tuples.pop(0)
-    #             card.from_suit_value(suit, value)
-    #             card.is_public = True
-    #             card.is_unknown = True
-    #             card.is_private = False
-    #
-    #             for player in game_state.players:
-    #                 if player.name == game_state.player_to_play.name:
-    #                     continue
-    #                 for c in player.hand:
-    #                     # If the card is in the player's hand, we make it unknown
-    #                     if c.suit == card.suit and c.value == card.value:
-    #                         c.is_unknown = True
-    #                         c.is_private = False
-    #                         c.is_public = True
-    #     return game_state
 
     def randomly_determinize(self, game_state):
         """Determinize the game state by randomly assigning unknown cards to players."""

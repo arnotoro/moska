@@ -1,15 +1,12 @@
 from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
-from moskaengine.players.random_player import RandomPlayer as Random
 from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
 from moskaengine.game.engine import MoskaGame
-import os
 import time
 import random
 import torch
 import math
 from multiprocessing import Pool, cpu_count, set_start_method
 from functools import partial
-from scipy.stats import chi2_contingency
 import gc
 
 def run_simulation(player_configs, idx):

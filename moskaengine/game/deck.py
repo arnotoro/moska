@@ -1,7 +1,6 @@
 from collections import deque
 from itertools import product
 from random import randint, seed, shuffle
-import copy
 
 # Possible values and suits for a card
 CARD_VALUES = tuple(range(2, 15))

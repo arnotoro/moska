@@ -1,5 +1,5 @@
 from moskaengine.players.abstract_player import AbstractPlayer
-from moskaengine.utils.card_utils import choose_random_action, basic_repr_game
+from moskaengine.utils.card_utils import choose_random_action
 
 
 class RandomPlayer(AbstractPlayer):

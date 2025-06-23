@@ -1,11 +1,10 @@
-from moskaengine.game.deck import Card, suit_to_symbol, StandardDeck
-from moskaengine.utils.card_utils import choose_random, game_action_repr
+from moskaengine.game.deck import Card, StandardDeck
 from moskaengine.players.human_player import Human
 from moskaengine.utils.card_utils import basic_repr_game, game_action_repr
 
 import itertools
 import random
-from collections import deque, defaultdict
+from collections import defaultdict
 
 from moskaengine.utils.game_utils import state_as_vector, save_game_vector
 

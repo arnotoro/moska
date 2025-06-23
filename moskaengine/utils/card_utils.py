@@ -1,8 +1,5 @@
 import random
 
-from moskaengine.game.deck import suit_to_symbol
-
-
 def choose_random(lst, weights=None):
     """Choose a random element"""
     if weights is None:
