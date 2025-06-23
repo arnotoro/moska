@@ -42,6 +42,7 @@ class MoskaGame:
                  save_vectors = False,
                  state_folder = "game_vectors",
                  file_format = "csv",
+                 save_history = True,
                  debug = False,
                  ):
 
@@ -401,6 +402,8 @@ class MoskaGame:
     def execute_action(self, action):
         # Add to history
         self.history.append((action, self.player_to_play.name))
+        if len(self.history) > self.N_HISTORY:
+            self.history.pop(0)
         action_type = action[0]
 
         if action_type == 'Attack':
@@ -551,54 +554,6 @@ class MoskaGame:
         else:
             raise NotImplementedError('Action to execute not implemented.')
 
-    # def clone_for_rollout(self):
-    #     new = MoskaGame(None, False, None, False, False)
-    #
-    #     # Copy players and related attributes
-    #     new.players = []
-    #     player_ids = {}
-    #     for pl in self.players:
-    #         copy_pl = pl.make_copy()
-    #         player_ids[id(pl)] = copy_pl
-    #         new.players.append(copy_pl)
-    #
-    #     # Copy player_ids mapping from old players to new players
-    #     new.player_ids = {player_ids[id(pl)]: idx for pl, idx in self.player_ids.items()}
-    #
-    #     new.deck = StandardDeck(shuffle=False, perfect_info=self.perfect_info)
-    #     new.deck.cards = deque(card.make_copy() for card in self.deck.cards)
-    #     new.cards_to_defend = [card.make_copy() for card in self.cards_to_defend]
-    #     new.cards_killed = [(card[0].make_copy(), card[1].make_copy()) for card in self.cards_killed]
-    #     new.cards_discarded = [card.make_copy() for card in self.cards_discarded]
-    #     new.trump_card = self.trump_card.make_copy()
-    #     new.all_cards_tuples = self.all_cards_tuples
-    #     new.all_cards = self.all_cards
-    #     new.card_collection = []
-    #     card_ids = {}
-    #     for card in self.card_collection:
-    #         copy_card = card.make_copy()
-    #         card_ids[id(card)] = copy_card
-    #         new.card_collection.append(copy_card)
-    #
-    #     new.attackers = [player_ids[id(p)] for p in self.attackers]
-    #     new.defender = player_ids.get(id(self.defender), None)
-    #     new.current_attacker = self.current_attacker
-    #     new.current_action = self.current_action
-    #     new.draw_undefended = self.draw_undefended
-    #     new.draw_order = [player_ids[id(p)] for p in self.draw_order]
-    #     new.player_to_play = player_ids[id(self.player_to_play)]
-    #     new.attacker_to_start_throwing = self.attacker_to_start_throwing
-    #     new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
-    #     new.loser = player_ids.get(id(self.loser), None)
-    #
-    #     new.n_turns = self.n_turns
-    #     new.perfect_info = self.perfect_info
-    #
-    #     # History
-    #     new.history = self.history.copy()
-    #
-    #     return new
-
     def clone_for_rollout(self):
         new = MoskaGame(None, False, None, False, False)
 
@@ -614,8 +569,11 @@ class MoskaGame:
         # Direct dictionary update for player_ids
         new.player_ids = {player_ids[id(pl)]: idx for pl, idx in self.player_ids.items()}
 
-        new.deck = StandardDeck(shuffle=False, perfect_info=self.perfect_info)
-        new.deck.cards = deque(card.make_copy() for card in self.deck.cards)
+        new.deck = StandardDeck(
+            shuffle=False,
+            perfect_info=self.perfect_info,
+            cards=[card.make_copy() for card in self.deck.cards]
+        )
 
         # Copy card lists
         new.cards_to_defend = [card.make_copy() for card in self.cards_to_defend]

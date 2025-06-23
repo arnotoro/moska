@@ -30,7 +30,7 @@ def run_simulation(random_seed):
     players = [Heuristic('H1'), Heuristic('H2'), Heuristic('H3'),
                DeterminizedMLPMCTS("NNMCTS", model, device, rollouts=100, expl_rate=0.7, scoring="win_rate")]
 
-    game = MoskaGame(players, computer_shuffle, save_vectors=False, print_info=True)
+    game = MoskaGame(players, computer_shuffle, save_vectors=False, print_info=False)
 
     while not game.is_end_state:
         game.next()
@@ -38,8 +38,8 @@ def run_simulation(random_seed):
     return str(game.loser).replace('Player ', ''), game.state_data, game.opponent_data
 
 if __name__ == '__main__':
-    total_games = 1
-    print_every = 1
+    total_games = 100
+    print_every = 10
     start_time = time.time()
 
     player_names = ['H1', 'H2', 'H3', 'NNMCTS']

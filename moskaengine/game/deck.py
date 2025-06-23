@@ -1,6 +1,7 @@
 from collections import deque
 from itertools import product
 from random import randint, seed, shuffle
+import copy
 
 # Possible values and suits for a card
 CARD_VALUES = tuple(range(2, 15))
@@ -33,14 +34,14 @@ class Card:
     # is_private = False # Does the holder know the card
     # is_unknown = True # Does no one know the card
 
-    def __init__(self, value=None, suit=None, kopled = False):
+    def __init__(self, value=None, suit=None, kopled = False, is_drawn=False, is_public=False, is_private=False, is_unknown=True):
         self.value = value
         self.suit = suit
         self.kopled = kopled
-        self.is_drawn = False
-        self.is_public = False
-        self.is_private = False
-        self.is_unknown = True
+        self.is_drawn = is_drawn
+        self.is_public = is_public
+        self.is_private = is_private
+        self.is_unknown = is_unknown
 
     def __hash__(self):
         return hash((self.value, self.suit))
@@ -86,16 +87,6 @@ class Card:
         new.is_unknown = self.is_unknown
         new.kopled = self.kopled
         return new
-        # new_card = Card(
-        #     value=self.value,
-        #     suit=self.suit,
-        #     kopled=self.kopled
-        # )
-        # new_card.is_drawn = self.is_drawn
-        # new_card.is_public = self.is_public
-        # new_card.is_private = self.is_private
-        # new_card.is_unknown = self.is_unknown
-        # return new_card
 
     def from_input(self, possible):
         """Get the suit and value of the card from the input
@@ -146,13 +137,15 @@ class StandardDeck:
     def __init__(self, shuffle = True, seed_value = None, perfect_info = False, cards = None):
         self.seed_value = seed_value if seed_value else randint(0, 100_000_000)
         seed(self.seed_value)
-        self.cards = deque(
-            Card(value, suit) for value, suit in product(
-                CARD_VALUES, CARD_SUITS
-            )
-        )
+
+        if cards is not None:
+            self.cards = deque(cards)
+        else:
+            self.cards = deque(Card(value, suit) for value, suit in product(CARD_VALUES, CARD_SUITS))
+
         if shuffle:
             self.shuffle()
+
         if perfect_info:
             for card in self.cards:
                 card.is_unknown = False

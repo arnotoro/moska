@@ -204,7 +204,7 @@ class DeterminizedMCTS(AbstractPlayer):
             if game_state.print_info:
                 print(f'{self} expects to not lose with {N} visits')
         elif self.scoring == "win_rate":
-            action_to_play, (W, N) = max(valid_total_ratings.items(), key=lambda x: x[1][0] / x[1][1])
+            action_to_play, (W, N) = max(valid_total_ratings.items(), key=lambda x: x[1][0] / (x[1][1] + 1e-10))
             if game_state.print_info:
                 print(f'{self} expects to not lose with {W/N*100:.2f}%')
         else:

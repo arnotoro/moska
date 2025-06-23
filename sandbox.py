@@ -2,6 +2,7 @@ import random
 import time
 import torch
 from sklearn.preprocessing import MinMaxScaler
+import math
 
 from moskaengine.game.engine import MoskaGame
 # from moskaengine.players.human_player import Human
@@ -16,18 +17,19 @@ siemen = random.randint(0, 1000000)
 print(f"Used seed: {siemen}")
 random.seed(2539) # For debug
 
-# Cuda
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-
-# Load the model
-model_path = "moskaengine/research/model_training/model_1.pth"
-model = HandPredictMLP(input_size=433, output_size=156)
-model.load_state_dict(torch.load(model_path, map_location=device))
+# # Cuda
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# print(f"Using device: {device}")
+#
+# # Load the model
+# model_path = "moskaengine/research/model_training/model_1.pth"
+# model = HandPredictMLP(input_size=433, output_size=156)
+# model.load_state_dict(torch.load(model_path, map_location=device))
 
 # Note the main attacker should be specified
 # The players can be one of ISMCTS, ISMCTSFPV, DeterminizedMCTS, Random, Human
-players = [Random("R1"), Random("R2"), Random("R3"), DeterminizedMCTS('MCTS', deals=1, rollouts=50, expl_rate=0.7, scoring="win_rate")]
+# players = [Random("R1"), Random("R2"), Random("R3"), DeterminizedMCTS('MCTS', deals=3, rollouts=750, expl_rate=math.sqrt(2), scoring="win_rate")]
+players = [Heuristic('H1'), Heuristic('H2'), Heuristic('H3'), DeterminizedMCTS('MCTS', deals=3, rollouts=100, expl_rate=math.sqrt(2), scoring="win_rate")]
 # players = [Random('Random'), DeterminizedMCTS('MCTS', deals=5, rollouts=200, expl_rate=0.7, scoring="win_rate")]
 # players  = [Random("R1"), Random("R2"), Random("R3"), DeterminizedMLPMCTS('NNMCTS', model, device, deals=1, rollouts=10, expl_rate=0.7, scoring="win_rate")]
 # players = [Human('Human1'), Human('Human2')]
@@ -35,7 +37,7 @@ players = [Random("R1"), Random("R2"), Random("R3"), DeterminizedMCTS('MCTS', de
 computer_shuffle = True
 
 start = time.time()
-game = MoskaGame(players, computer_shuffle, perfect_info=False, save_vectors=True, print_info=True, main_attacker="R1")
+game = MoskaGame(players, computer_shuffle, perfect_info=False, save_vectors=False, print_info=False)
 while not game.is_end_state:
     game.next()
 

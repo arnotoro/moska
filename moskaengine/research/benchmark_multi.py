@@ -12,7 +12,7 @@ from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
 from moskaengine.players.random_player import RandomPlayer as Random
 
 def run_simulation(players_list, random_seed):
-    random.seed(random_seed + random.randint(0, 1000000))
+    random.seed(random.randint(0, 1000000))
     computer_shuffle = True
     game = MoskaGame(players_list, computer_shuffle, save_vectors=False, print_info=False)
     while not game.is_end_state:
@@ -20,13 +20,16 @@ def run_simulation(players_list, random_seed):
     return str(game.loser).replace('Player ', ''), game.state_data, game.opponent_data
 
 if __name__ == '__main__':
-    total_games = 500
+    total_games = 100
     print_every = 10
     start_time = time.time()
 
-    # players = [Random('Random1'), Random('Random2'), Random('Random3'), DeterminizedMCTS('MCTS_reference', deals=3, rollouts=100, expl_rate=0.7, scoring="win_rate")]
-    players = [Heuristic('H1'), Heuristic('H2'), Heuristic('H3'), DeterminizedMCTS('MCTS_reference', deals=3, rollouts=100, expl_rate=0.7, scoring="win_rate")]
-
+    players = [Random('Random1'), Random('Random2'), Random('Random3'), DeterminizedMCTS('MCTS_reference', deals=3, rollouts=250, expl_rate=0.7, scoring="win_rate")]
+    # players = [Heuristic('Heuristic1'), Heuristic('Heuristic2'), Heuristic('Heuristic3'), DeterminizedMCTS('MCTS_reference', deals=1, rollouts=100, expl_rate=0.7, scoring="win_rate")]
+    # players = [DeterminizedMCTS('MCTS_reference1', deals=3, rollouts=100, expl_rate=1, scoring="win_rate"),
+    #            DeterminizedMCTS('MCTS_reference2', deals=3, rollouts=100, expl_rate=1, scoring="win_rate"),
+    #            DeterminizedMCTS('MCTS_reference3', deals=3, rollouts=100, expl_rate=1, scoring="win_rate"),
+    #            DeterminizedMCTS('MCTS_reference4', deals=3, rollouts=100, expl_rate=1, scoring="win_rate")]
     losses = {player.name: 0 for player in players}
 
     with Pool(processes=cpu_count()) as pool:

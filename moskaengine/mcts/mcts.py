@@ -1,6 +1,6 @@
 from math import log, sqrt
 from moskaengine.utils.card_utils import choose_random_action
-improt random
+import random
 
 class Node:
     """

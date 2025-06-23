@@ -14,8 +14,9 @@ import math
 from multiprocessing import Pool, cpu_count
 from functools import partial
 
-def run_simulation(players_list, random_seed):
-    random.seed(random_seed + random.randint(0, 1000000))
+def run_simulation(players_list, idx):
+    # print(f"Running simulation {idx}")
+    random.seed(random.randint(0, 1000000))
     computer_shuffle = True
     game = MoskaGame(players_list,
                      computer_shuffle,
@@ -27,17 +28,15 @@ def run_simulation(players_list, random_seed):
     return str(game.loser).replace('Player ', '')
 
 if __name__ == '__main__':
-    total_games = 250
+    total_games = 100
     print_every = 1
-
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-
-    # Load model (if using NN-MCTS)
-    model_path = "model_training/card_predictor_1.pth"
-    model = CardPredictorMLP(input_size=433, output_size=156)
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # print(f"Using device: {device}")
+    #
+    # # Load model (if using NN-MCTS)
+    # model_path = "model_training/card_predictor_1.pth"
+    # model = CardPredictorMLP(input_size=433, output_size=156)
+    # model.load_state_dict(torch.load(model_path, map_location=device))
 
     # Exploration rates to test
     expl_rates = [0.05, 0.3, 0.5, 0.7, 1, math.sqrt(2), 2.0, 3.0]
@@ -50,8 +49,8 @@ if __name__ == '__main__':
         players = [
             Heuristic('H1'),
             Heuristic('H2'),
-            DeterminizedMCTS('MCTS_reference', deals=3, rollouts=100, expl_rate=1, scoring="win_rate"),
-            DeterminizedMCTS('MCTS_test', deals=3, rollouts=100, expl_rate=expl_rate, scoring="win_rate")
+            Heuristic('H3'),
+            DeterminizedMCTS('MCTS_test', deals=2, rollouts=250, expl_rate=expl_rate, scoring="win_rate")
         ]
 
         losses = {player.name: 0 for player in players}
@@ -63,7 +62,7 @@ if __name__ == '__main__':
             for loser_name in pool.imap_unordered(run_func, range(total_games)):
                 losses[loser_name] += 1
                 completed += 1
-
+                print(f"Game {completed}/{total_games} completed: {loser_name}\n")
                 if completed % print_every == 0:
                     print(f"{completed}/{total_games} games completed...", end='\r')
 
