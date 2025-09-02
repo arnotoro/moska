@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moska-mcts"
+version = "1.0.0"
+description = "A card game engine for Moska with AI players (MCTS, heuristic, and neural network-based)."
+authors = [{name = "Arno Törö"}]
+requires-python = ">=3.9"
+
+
+dependencies = [
+    "torch>=2.8.0",
+    "numpy>=2.3.2",
+    "scikit-learn>=1.7.1",
+    "tqdm>=4.67.1",
+    "pandas>=2.3.2",
+    "pyarrow>=21.0.0",
+    "matplotlib>=3.10.6"
+]

@@ -1,0 +1,7 @@
+torch>=2.8.0
+numpy>=2.3.2
+scikit-learn>=1.7.1
+tqdm>=4.67.1
+pandas>=2.3.2
+pyarrow>=21.0.0
+matplotlib>=3.10.6

@@ -11,69 +11,66 @@ CARD_SUITS_SYMBOLS = {1: "♣", 2: "♠", 3: "♥", 4: "♦", "X": "X"}
 
 
 def suit_to_symbol(suit):
-    # Handle None case
-    if suit is None:
-        return "None"
-    # Handle integer input directly
-    if isinstance(suit, int):
-        return CARD_SUITS_SYMBOLS[suit]
-    # Handle tuple input - extract first element if it's a tuple
-    if isinstance(suit, tuple):
-        if len(suit) > 0:
-            return CARD_SUITS_SYMBOLS[suit[0]]  # Use the first element
-        else:
-            return "Unknown"  # Handle empty tuple
-    # Original behavior for string input
-    return CARD_SUITS_SYMBOLS[suit[1:]]
+    # Convert suit to symbol based on int value
+    return CARD_SUITS_SYMBOLS[suit] if suit in CARD_SUITS_SYMBOLS else str(suit)
 
 def value_to_letter(value):
     return CARD_VALUES_SYMBOLS[value] if value in CARD_VALUES_SYMBOLS else str(value)
 
-
 class Card:
     """ A regular Moska playing card.
-    
+
     Can be unknown to all, private to holder or public to all.
     """
-    suit = None
-    value = None
-    trump_suit = None
+    __slots__ = ('value', 'suit', 'is_drawn', 'is_public', 'is_private', 'is_unknown', 'kopled')
+    # suit = None
+    # value = None
+    # is_drawn = None
+    # kopled = False
 
-    # Always one of the following is true
-    is_public = False # Does everyone know the card
-    is_private = False # Does the holder know the card
-    is_unknown = True # Does no one know the card
+    # # Always one of the following is true
+    # is_public = False # Does everyone know the card
+    # is_private = False # Does the holder know the card
+    # is_unknown = True # Does no one know the card
 
-    def __eq__(self, other):
-        return self.suit == other.suit and self.value == other.value
-    
-    def __str__(self):
+    def __init__(self, value=None, suit=None, kopled = False, is_drawn=False, is_public=False, is_private=False, is_unknown=True):
+        self.value = value
+        self.suit = suit
+        self.kopled = kopled
+        self.is_drawn = is_drawn
+        self.is_public = is_public
+        self.is_private = is_private
+        self.is_unknown = is_unknown
+
+    def __hash__(self):
+        return hash((self.value, self.suit))
+
+    def __repr__(self):
         if self.is_unknown:
             return "-X"
         else:
-            if self.is_private:
-                string = "P"
-            else:
-                string = "A"
-            
-            assert self.suit is not None
-            string += suit_to_symbol(self.suit)
-            string += value_to_letter(self.value)
-            return string
-            
-    def __repr__(self):
-        if self.value in CARD_VALUES_SYMBOLS:
-            return str(f"{CARD_VALUES_SYMBOLS[self.value]}{suit_to_symbol(self.suit)}")
-        return str(f"{self.value}{suit_to_symbol(self.suit)}")
-    
-    def reset(self):
+            return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
+
+    def __len__(self):
+        # TODO: This is a bit of a hack, but it works for now
+        return 1
+
+    def __eq__(self, other):
+        return self.suit == other.suit and self.value == other.value
+
+    def __lt__(self, other):
+        return self.value < other.value
+
+    def __str__(self):
+        return str(f"{value_to_letter(self.value)}{suit_to_symbol(self.suit)}")
+
+    def reset(self, suit=None, value=None):
         """Reset values or make unknown (useful for keeping same memory address)"""
         # Keeping the same memory address is adamant for this program
         # (not only the copy) as otherwise self.card_collection would
         # not be a collection of the cards anymore.
         self.suit = None
         self.value = None
-        self.trump_suit = None
         self.is_public = False
         self.is_private = False
         self.is_unknown = True
@@ -81,17 +78,14 @@ class Card:
     def make_copy(self):
         """Returns a copy of the card"""
         new = Card()
-        new.suit = self.suit
         new.value = self.value
-        new.trump_suit = self.trump_suit
+        new.suit = self.suit
+        new.is_drawn = self.is_drawn
         new.is_public = self.is_public
         new.is_private = self.is_private
         new.is_unknown = self.is_unknown
+        new.kopled = self.kopled
         return new
-    
-    def is_trump(self):
-        """Checks if the current card is a trump card or not"""
-        return self.suit == self.trump_suit
 
     def from_input(self, possible):
         """Get the suit and value of the card from the input
@@ -126,42 +120,73 @@ class Card:
         self.value = value
         self.is_unknown = False
 
+    def from_card(self, other_card):
+        """Copy data from another card"""
+        assert self.is_unknown
+        self.suit = other_card.suit
+        self.value = other_card.value
+        self.is_unknown = False
+
 class StandardDeck:
     "A deck of playing cards."
 
     seed_value : int = None
     cards : deque = None
 
-    def __init__(self, shuffle = True, seed_value = None):
+    def __init__(self, shuffle = True, seed_value = None, perfect_info = False, cards = None):
         self.seed_value = seed_value if seed_value else randint(0, 100_000_000)
         seed(self.seed_value)
-        self.cards = deque(
-            Card(value, suit) for value, suit in product(
-                CARD_VALUES, CARD_SUITS
-            )
-        )
+
+        if cards is not None:
+            self.cards = deque(cards)
+        else:
+            self.cards = deque(Card(value, suit) for value, suit in product(CARD_VALUES, CARD_SUITS))
+
         if shuffle:
             self.shuffle()
+
+        if perfect_info:
+            for card in self.cards:
+                card.is_unknown = False
+                card.is_private = False
+                card.is_public = True
 
     def __len__(self):
         return len(self.cards)
 
     def __str__ (self):
         return f"Deck has {len(self)} cards left"
-    
+
     def __repr__(self):
-        return f"Cards left in the deck: {', '.join(repr(card) for card in self.cards)}"
-    
+        s = ""
+        for card in self.cards:
+            s += str(card) + " "
+        return s
+
+    def __hash__(self):
+        return hash(tuple(self.cards))
+
+    def __iter__(self):
+        return iter(self.cards)
+
     def shuffle(self):
         shuffle(self.cards)
 
     def pop(self, n):
         "Pop (draw) n cards from the top of the deck."
-
+        hand = []
         if not self.cards or n <= 0:
             return []
-        
-        return [self.cards.popleft() for _ in range(min(len(self), n))]
+
+        for _ in range(min(len(self), n)):
+            card = self.cards.popleft()
+            # card.is_unknown = True
+            # card.is_private = False
+            # card.is_public = False
+            hand.append(card)
+
+        # hand = [self.cards.popleft() for _ in range(min(len(self), n))]
+        return hand
     
     def place_bottom(self, card):
         "Place a card at the bottom of the deck."
@@ -172,7 +197,9 @@ class StandardDeck:
         self.cards.appendleft(card)
 
     def copy(self):
-        "Returns a copy of the deck."
+        "Returns a deep copy of the deck."
         new_deck = StandardDeck(shuffle=False, seed_value=self.seed_value)
-        new_deck.cards = self.cards.copy()
+        cards = self.cards
+        make = Card.make_copy
+        new_deck.cards = deque(make(card) for card in cards) # faster via local
         return new_deck

@@ -1,17 +1,18 @@
-from abc import ABC, abstractmethod
 import random
+from abc import ABC, abstractmethod
 
-from moskaengine.utils.card_utils import choose_random
+# Moskaengine imports
+from ..utils import choose_random
 
 class AbstractPlayer(ABC):
 
     def __init__(self, name):
         self.name = name
         self.hand = []
-
+        self.id = None
     
     def __str__(self):
-        return f"Player {self.name}"
+        return f"{self.name}"
 
     def fill_hand(self, deck):
         """Fill the hand with cards from the deck"""
@@ -27,14 +28,16 @@ class AbstractPlayer(ABC):
                 return deck
             
             # Otherwise, draw the cards
-            card_drawn = deck.pop(0)
+            card_drawn = deck.pop(1)[0]
+            card_drawn.is_private = True
+            card_drawn.is_public = False
+            card_drawn.is_unknown = False
             self.hand.append(card_drawn)
 
         return deck
     
     def make_cards_known(self, game_state):
-        """Make the cards in the hand known to the player"""
-
+        """Makes the cards in the players hand not unknown"""
         for card in self.hand:
             # All cards must be unknown
             if card.is_unknown:
@@ -50,20 +53,22 @@ class AbstractPlayer(ABC):
         """Returns the (suit, value) pairs this person can play from his hand"""
         possible = set()
 
+        # TODO: Might break here, due to the card visibility attributes
         for card in self.hand:
             if card.is_unknown:
                 possible.update(non_public_cards)
             else:
-                possible.add((card.suit, card.value))
+                possible.add(card)
 
         return possible
     
     def discard_card(self, game_state, suit, value, remove = True):
         """Discard a card from the hand with the given suit and value"""
         # TODO: Comment this
-        for id, card in enumerate(self.hand):
+        for idx, card in enumerate(self.hand):
             if card.is_unknown:
-                if (suit, value) in game_state.get_non_public_cards():
+                non_public_cards = game_state.get_non_public_cards_tuples()
+                if (suit, value) in game_state.get_non_public_cards_tuples():
                     if (suit, value) not in [(c.suit, c.value) for c in self.hand if not c.is_unknown]:
                         card.suit = suit
                         card.value = value
@@ -75,72 +80,49 @@ class AbstractPlayer(ABC):
             raise BaseException('Card not possible to discard')
         
         if remove:
-            card_played = self.hand.pop(id)
+            card_played = self.hand.pop(idx)
         else:
-            card_played = self.hand[id]
+            card_played = self.hand[idx]
 
         card_played.is_unknown = False
         card_played.is_private = False
         card_played.is_public = True
 
         return card_played
-    
-    def can_throw(self, fallback_identities, cards):
-        """Check if the player can throw the given cards
-        Fallback identities are the options of the cards if it is unknown
-        """
-        poss = []
-        cards_set = set(cards)
-        fallback = 0
 
+    def can_throw(self, fallback_identities, cards):
+        """Check if the player can throw the given cards. Fallback identities are the options for unknown cards."""
+        cards_set = set(cards)  # Set of target cards for fast lookups
+        fallback = 0
+        poss = []
+
+        # Classify the cards in hand into known and unknown cards
+        known_cards = set()
         for card in self.hand:
             if card.is_unknown:
                 fallback += 1
             else:
-                identity = (card.suit, card.value)
+                known_cards.add(card)  # Store the card directly
 
-                # Check if this card has an identity that match a card in cards
-                if identity in cards_set:
-                    poss.append({identity})
+        # Match known cards in hand with the cards to throw
+        for card in cards:
+            if card in known_cards:
+                poss.append({card})  # Known valid card
 
-        # Easy case, poss is not big enough to consist of len(cards) cards
-        # if len(poss) < len(cards):
-        if len(poss) + fallback < len(cards):
-            return False
+        # If we don't have enough known cards to satisfy the throw, add fallback identities
+        remaining_needed = len(cards) - len(poss)
+        if remaining_needed > 0:
+            fallback_identities_needed = min(fallback, remaining_needed)
+            poss += [set(fallback_identities) for _ in range(fallback_identities_needed)]
 
-        # Add fallbacks, the minimum amount needed
-        poss += [fallback_identities.copy() for _ in range(min(fallback, len(cards)))]
-        ### We need to check if we can play cards, having poss
-        # # Easy case, one of the cards is not in poss
-        # p = set()
-        # for i in poss:
-        #     p = p.union(i)
-        # for c in cards:
-        #     if c not in p:
-        #         return False
-        # Greedy approach: take the nth card from the first allowed poss
-        poss2 = [i.copy() for i in poss]
-        for c in cards:
-            for idx, p in enumerate(poss2):
-                if c in p:
-                    poss2.pop(idx)
-                    break
-            else:
-                return False
-        return True
+        # Check if we can match all cards in poss, either by direct match or fallback
+        remaining_cards = set(cards)  # We need to match each card in cards
+        poss_set = set(card for subset in poss for card in subset)  # Flatten poss into a set for faster checking
 
-        # # Otherwise iterating through all options
-        # # -> takes a long time
-        # for _ in range(len(poss) - len(cards)):
-        #     cards.append(0)
-        # for perm in permutations(cards, r=len(cards)):
-        #     # print(perm, poss)
-        #     for idx, card in enumerate(perm):
-        #         if card != 0 and card not in poss[idx]:
-        #             break
-        #     else:
-        #         return True
-        # return False
+        # If poss contains all the needed cards, we can throw
+        if remaining_cards.issubset(poss_set):
+            return True
+        return False
 
     def determinize_hand(self, game_state):
         """Returns a possible determinization for the hand of this player"""
@@ -156,7 +138,7 @@ class AbstractPlayer(ABC):
         # Check if we need to do anything
         if len(unknown_cards) > 0:
             # We pop from all the unknown cards as possible cards
-            unknown = list(game_state.get_non_public_cards())
+            unknown = list(game_state.get_non_public_cards_tuples())
             for unknown_card in unknown_cards:
                 suit, value = unknown.pop(random.randint(0, len(unknown)-1))
                 unknown_card.from_suit_value(suit, value)
@@ -171,4 +153,4 @@ class AbstractPlayer(ABC):
     @abstractmethod
     def make_copy(self):
         """Make a copy of the player without copying the hand"""
-        pass             
+        pass
