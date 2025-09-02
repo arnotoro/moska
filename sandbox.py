@@ -3,37 +3,52 @@ import time
 import torch
 from sklearn.preprocessing import MinMaxScaler
 import math
+import random
+import time
+import torch
+from sklearn.preprocessing import MinMaxScaler
+import math
+import numpy as np
 
-from moskaengine.game.engine import MoskaGame
-# from moskaengine.players.human_player import Human
-from moskaengine.players.random_player import RandomPlayer as Random
-from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
-from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
-from moskaengine.players.determinized_nn_mcts_player import DeterminizedMLPMCTS
-from moskaengine.research.model_training.train_model import HandPredictMLP
+# Moskaengine imports
+from research import HandPredictMLP
+from moskaengine import MoskaGame, HumanPlayer, RandomPlayer, MCTSPlayer, HeuristicPlayer, NNMCTSPlayer
 
 siemen = random.randint(0, 1000000)
 # random.seed(siemen)
 print(f"Used seed: {siemen}")
-random.seed(2539) # For debug
+random.seed(siemen) # For debug
 
 # # Cuda
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(f"Using device: {device}")
-#
-# # Load the model
-# model_path = "moskaengine/research/model_training/model_1.pth"
-# model = HandPredictMLP(input_size=433, output_size=156)
-# model.load_state_dict(torch.load(model_path, map_location=device))
 
-# Note the main attacker should be specified
-# The players can be one of ISMCTS, ISMCTSFPV, DeterminizedMCTS, Random, Human
-# players = [Random("R1"), Random("R2"), Random("R3"), DeterminizedMCTS('MCTS', deals=3, rollouts=750, expl_rate=math.sqrt(2), scoring="win_rate")]
-players = [Heuristic('H1'), Heuristic('H2'), Heuristic('H3'), DeterminizedMCTS('MCTS', deals=3, rollouts=100, expl_rate=math.sqrt(2), scoring="win_rate")]
-# players = [Random('Random'), DeterminizedMCTS('MCTS', deals=5, rollouts=200, expl_rate=0.7, scoring="win_rate")]
-# players  = [Random("R1"), Random("R2"), Random("R3"), DeterminizedMLPMCTS('NNMCTS', model, device, deals=1, rollouts=10, expl_rate=0.7, scoring="win_rate")]
-# players = [Human('Human1'), Human('Human2')]
-# Does the computer shuffle the deck? False for human input used in real-life simulation. Not working yet.
+# # Load the model for DeterminizedMLPMCTS
+# model_path = "models/hand_predict_mlp_25k_95epochs.pth"
+# checkpoint = torch.load(model_path, map_location=torch.device('cpu'), weights_only=False)
+
+# # Load model weights
+# model = HandPredictMLP(input_size=485, output_size=156)
+# model.load_state_dict(checkpoint['model_state_dict'])
+# model.eval()
+
+# # Rebuild the scaler with loaded params
+# scaler = MinMaxScaler()
+# scaler.data_min_ = checkpoint['scaler_min']
+# scaler.data_max_ = checkpoint['scaler_max']
+# scaler.scale_ = checkpoint['scaler_scale']
+
+# # For MinMaxScaler, set these attributes:
+# scaler.min_ = np.zeros_like(scaler.scale_)
+# scaler.data_range_ = scaler.data_max_ - scaler.data_min_
+# scaler.n_samples_seen_ = np.array([1])  # dummy value, can be any positive integer
+
+# print("Model and scaler loaded successfully.")
+
+
+players = [HumanPlayer('me'), HeuristicPlayer('H2'), HeuristicPlayer('H3'), MCTSPlayer('MCTS', deals=10, rollouts=750, expl_rate=1.7, scoring="win_rate")]
+# players = [HumanPlayer('me'), HeuristicPlayer('H2'), HeuristicPlayer('H3'), DeterminizedMLPMCTS('NNMCTS', model, scaler, device, deals=10, rollouts=750, expl_rate=math.sqrt(2), scoring="win_rate")]
+
 computer_shuffle = True
 
 start = time.time()

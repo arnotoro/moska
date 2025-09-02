@@ -1,7 +1,8 @@
-from abc import ABC, abstractmethod
 import random
+from abc import ABC, abstractmethod
 
-from moskaengine.utils.card_utils import choose_random
+# Moskaengine imports
+from ..utils import choose_random
 
 class AbstractPlayer(ABC):
 
@@ -52,6 +53,7 @@ class AbstractPlayer(ABC):
         """Returns the (suit, value) pairs this person can play from his hand"""
         possible = set()
 
+        # TODO: Might break here, due to the card visibility attributes
         for card in self.hand:
             if card.is_unknown:
                 possible.update(non_public_cards)
@@ -151,4 +153,4 @@ class AbstractPlayer(ABC):
     @abstractmethod
     def make_copy(self):
         """Make a copy of the player without copying the hand"""
-        pass             
+        pass

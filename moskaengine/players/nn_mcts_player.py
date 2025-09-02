@@ -1,20 +1,21 @@
-from moskaengine.players.abstract_player import AbstractPlayer
-from moskaengine.mcts.mcts import MCTS
-from moskaengine.utils.game_utils import state_as_vector
-from moskaengine.research.model_training.OLD_train_model import CardPredictorMLP
-from moskaengine.utils.game_utils import check_unique_game_state
-from moskaengine.game.deck import Card, StandardDeck
 import random
-import torch
 import numpy as np
+import torch
 from collections import deque
 
-class DeterminizedMLPMCTS(AbstractPlayer):
+from research import HandPredictMLP
+# Moskaengine imports
+from ..game.deck import Card, StandardDeck
+from .abstract_player import AbstractPlayer
+from ..mcts.mcts import MCTS
+from ..utils import state_as_vector, check_unique_game_state
+
+class NNMCTSPlayer(AbstractPlayer):
     """
 
 
     """
-    def __init__(self, name, model, device, deals=1, rollouts=100, expl_rate=0.7, scoring="win_rate", scaler = None):
+    def __init__(self, name, model, scaler, device, deals=1, rollouts=100, expl_rate=0.7, scoring="win_rate"):
         super().__init__(name)
         self.name = name
         self.hand = []
@@ -25,11 +26,11 @@ class DeterminizedMLPMCTS(AbstractPlayer):
         self.expl_rate = expl_rate
         self.device = device
         self.model = model.to(self.device)
-        self.scaler = scaler # Placeholder for scaler, if used in the future
+        self.scaler = scaler
 
 
     def make_copy(self):
-        new = DeterminizedMLPMCTS(self.name, self.model, self.device)
+        new = NNMCTSPlayer(self.name, self.model, self.scaler, self.device)
         new.hand = self.hand.copy()
         return new
 
@@ -57,29 +58,20 @@ class DeterminizedMLPMCTS(AbstractPlayer):
         if not unknown_cards:
             return game_state
 
-        # Encode the current game state into input vector
         input_state_vector, _ = state_as_vector(game_state)
 
         # If a scaler is provided, scale the input state vector
         if self.scaler is not None:
-            # Transform to numpy array
             input_state_vector = np.array(input_state_vector, dtype=np.float32)
-            # Find non-binary features
-            non_binary_columns = np.where((input_state_vector != 0) & (input_state_vector != 1))[0]
-            # Remove the first column (deck size) from scaling
-            non_binary_columns = non_binary_columns[non_binary_columns != 0]  # Exclude the first column
-            # Scaler is applied to non-binary features e.g. anything other than 0 or 1 values
-            values_to_scale = input_state_vector[non_binary_columns].reshape(-1, 1)  # Reshape for scaler
+            minmax_cols = list(range(165, 170))  # 166-169 are player hand sizes, 170 is game turn
+            deck_col = 0  # Deck size (column 0)
 
-            # Fit and transform the non-binary features
-            scaled_values = self.scaler.fit_transform(values_to_scale)
-
-            # Apply a fixed scaling to the first column (deck size)
-            normalized_deck = len(game_state.deck.cards) / 52.0 # Normalize deck size to [0, 1]
-            input_state_vector[0] = normalized_deck
-            # Flatten back to original shape
-            input_state_vector[non_binary_columns] = scaled_values.flatten()
-            # input_state_vector[non_binary_columns] = self.scaler.fit_transform(input_state_vector[non_binary_columns])
+            # Normalize the deck size
+            input_state_vector[deck_col] = len(game_state.deck.cards) / 52.0
+            # Scale the min-max columns
+            minmax_values = input_state_vector[minmax_cols].reshape(1, -1)
+            scaled_minmax_values = self.scaler.transform(minmax_values)
+            input_state_vector[minmax_cols] = scaled_minmax_values.flatten()
 
         # Convert the input state vector to a tensor
         input_state_tensor = torch.tensor(input_state_vector, dtype=torch.float32).unsqueeze(0).to(self.device)
@@ -88,7 +80,6 @@ class DeterminizedMLPMCTS(AbstractPlayer):
         self.model.eval()
         with torch.no_grad():
             logits = self.model(input_state_tensor)
-            # Apply sigmoid to get probabilities of multi-label classification
             probs = torch.sigmoid(logits).squeeze()
 
         # Reshape probabilities to match the number of opponents
@@ -98,14 +89,6 @@ class DeterminizedMLPMCTS(AbstractPlayer):
         # Get the number of hidden cards for each opponent
         opponents = [player for player in game_state.players if player != game_state.player_to_play]
         original_hand_sizes = {player: len(player.hand) for player in opponents}
-
-        # ### DEBUG ###
-        # # Correct cards
-        # for i, player in enumerate(opponents):
-        #     print(f"Opponent {i} actual cards: {player.hand}")
-        #     print()  # New line after each opponent's cards
-        # ##################
-
 
         # Ensure each player's hand is cleared of private cards
         for player in opponents:
@@ -215,7 +198,12 @@ class DeterminizedMLPMCTS(AbstractPlayer):
 
             # Determinize the game state
             copied = self.determinize_with_model(copied)
-            check_unique_game_state(copied)
+
+            # Print the determinized game state for debugging
+            # for pl in copied.players:
+            #     print(f"Player {pl.name} hand: {[str(card) for card in pl.hand]}")
+
+            # check_unique_game_state(copied)
 
             # Search tree from previous iterations
             search_tree = game_state.player_to_play.mcts

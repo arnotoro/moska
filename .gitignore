@@ -1,22 +1,40 @@
-.*/
+# Virtual environments
+.venv/
 
-# Ignore __pycache__ directories
-__pycache__/
-
-*.egg-info/
-
-roadmap.md
-
-
-vectors*/
-results/
-
-*.ipynb
-*.png
-*.pdf
-*.pt
-*.pth
-*.zip
+# IDE configs
+.idea/
+.vscode/
 
 # Ignore MacOS system files
 .DS_Store
+
+# Python
+__pycache__/
+*.egg-info/
+.python-version
+
+# Jupyter test files
+*.ipynb_checkpoints/
+*.ipynb
+
+# Data vectors and results
+vectors*/
+results/
+*.png
+*.pdf
+*.zip
+*.csv
+
+# Models
+# models/
+# *.pt
+# *.pth
+
+# Other
+roadmap.md
+
+
+
+
+
+

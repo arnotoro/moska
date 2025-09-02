@@ -1,5 +1,7 @@
-from moskaengine.players.abstract_player import AbstractPlayer
 import random
+
+# Moskaengine imports
+from .abstract_player import AbstractPlayer
 
 class HeuristicPlayer(AbstractPlayer):
     def make_copy(self):

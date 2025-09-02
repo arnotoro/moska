@@ -1,25 +1,15 @@
-from moskaengine.game.deck import Card, StandardDeck
-from moskaengine.players.human_player import Human
-from moskaengine.utils.card_utils import basic_repr_game, game_action_repr
-
-import itertools
 import random
+import itertools
 from collections import defaultdict
 
-from moskaengine.utils.game_utils import state_as_vector, save_game_vector
-
+# Moskaengine imports
+from ..game.deck import Card, StandardDeck
+from ..players.human_player import HumanPlayer
+from ..utils import basic_repr_game, game_action_repr, state_as_vector, save_game_vector
 
 class MoskaGame:
     """
     The class for representing a game of Moska.
-
-    Args:
-        - players:          The players in the game as classes
-        - computer_shuffle: If set to True, the computer shuffles and the
-                                game is virtual, if set to False, you have
-                                to shuffle and draw the cards irl and tell
-                                it to the computer.
-        - main_attacker:    The name of the starting attacker
     """
 
     is_end_state = False
@@ -393,10 +383,19 @@ class MoskaGame:
             raise ValueError(f"Unknown action {action}")
 
         if not possible_actions:
-            raise BaseException(f"No possible actions for {player.name} in {action}")
+            # TODO: Bug may be when player has killed all cards during mcts but the killed_cards are empty -> turn does not transfer over to next player
+            print(self.current_attacker, self.player_to_play, self.current_action, self.defender, self.cards_to_defend, self.cards_killed)
+            print(f"Defender {self.defender} hand size: {len(self.defender.hand)} and cards_by_value: {cards_by_value}")
+            print(f"No possible actions for {player.name}, game state: {basic_repr_game(self)}")
+            print(f"Players remaining: {[p.name for p in self.attackers]}")
+            if self.current_action == 'Attack' and len(self.defender.hand) == 0 and len(self.deck) == 0:
+                # If the defender has no cards left, they are out of the game and the next attacker is the one to the left of the defender
+                self.new_attack(self.attackers[(self.current_attacker + 1) % len(self.attackers)])
+            else:
+                raise BaseException(f"No possible actions for {player.name} in {action}")
 
         return possible_actions
-
+    
 
     def execute_action(self, action):
         # Add to history
@@ -447,11 +446,25 @@ class MoskaGame:
                 self.cards_killed.append((defended_card, played_card))
                 self.cards_discarded.extend([defended_card, played_card])
 
-
             if not self.cards_to_defend:
+                # TODO: This is a bug when the defender defends all and the deck is empty, they should be out of the game. This is does not happen in the current game logic.
                 # No more cards to defend, switch to attacking
-                self.player_to_play = self.attackers[self.current_attacker]
-                self.current_action = 'Attack'
+                if len(self.defender.hand) == 0 and len(self.deck) == 0:
+                    # print(f"Defender {self.defender} has no cards left, switching to the next attacker.")
+                    # print(f"Cards killed: {self.cards_killed}")
+                    # print(f"Cards to defend: {self.cards_to_defend}")
+                    # print(basic_repr_game(self))
+                    # print(f"Players remaining: {[p.name for p in self.attackers]}")
+                    # print(self.player_to_play, self.attackers, self.current_attacker, self.current_action)
+                    # If the defender has no cards left, they are out of the game and the next attacker is the one to the left of the defender
+                    #self.attackers.remove(self.defender)
+                    self.new_attack(self.attackers[(self.current_attacker + 1) % len(self.attackers)])
+                    # self.defender = self.attackers[self.current_attacker % len(self.attackers)]
+                    # self.player_to_play = self.attackers[self.current_attacker]
+                    # self.current_action = 'Attack'
+                else:
+                    self.player_to_play = self.attackers[self.current_attacker]
+                    self.current_action = 'Attack'
 
             # Make the played cards public
             self.make_discarded_cards_public(cards_played + cards_defended)
@@ -479,9 +492,9 @@ class MoskaGame:
 
             # If all the cards are defended, the game continues accordingly
             if not self.cards_to_defend:
-                # No more cards to defend, switch to attacking
-                self.player_to_play = self.attackers[self.current_attacker]
-                self.current_action = 'Attack'
+                    # No more cards to defend, switch to attacking
+                    self.player_to_play = self.attackers[self.current_attacker]
+                    self.current_action = 'Attack'
             return
 
         elif action_type in ('TakeAll', 'TakeDefend'):
@@ -554,48 +567,41 @@ class MoskaGame:
             raise NotImplementedError('Action to execute not implemented.')
 
     def clone_for_rollout(self):
+        """Clone the game for a rollout."""
+        players = self.players
+        copy_card = Card.make_copy
+        
         new = MoskaGame(None, False, None, False, False)
 
         # Copy players and build player_ids mapping
-        new.players = []
-        player_ids = {}
-
-        for pl in self.players:
-            copy_pl = pl.make_copy()
-            player_ids[id(pl)] = copy_pl
-            new.players.append(copy_pl)
-
-        # Direct dictionary update for player_ids
+        player_ids = {id(pl): pl.make_copy() for pl in players}
+        new.players = list(player_ids.values())
         new.player_ids = {player_ids[id(pl)]: idx for pl, idx in self.player_ids.items()}
 
         new.deck = StandardDeck(
             shuffle=False,
             perfect_info=self.perfect_info,
-            cards=[card.make_copy() for card in self.deck.cards]
+            cards=list(map(copy_card, self.deck.cards))
         )
 
         # Copy card lists
-        new.cards_to_defend = [card.make_copy() for card in self.cards_to_defend]
-        new.cards_killed = [(card[0].make_copy(), card[1].make_copy()) for card in self.cards_killed]
-        new.cards_discarded = [card.make_copy() for card in self.cards_discarded]
-
-        # Copy trump card
-        new.trump_card = self.trump_card.make_copy()
+        new.cards_to_defend = list(map(copy_card, self.cards_to_defend))
+        new.cards_killed = [(copy_card(card[0]), copy_card(card[1])) for card in self.cards_killed]
+        new.cards_discarded = list(map(copy_card, self.cards_discarded))
+        new.trump_card = copy_card(self.trump_card)
+        new.card_collection = list(map(copy_card, self.card_collection))
 
         # Direct references for simple collections
         new.all_cards_tuples = self.all_cards_tuples
         new.all_cards = self.all_cards
 
-        # Copy card collection
-        new.card_collection = [card.make_copy() for card in self.card_collection]
-
         # Copy simple player references using player_ids mapping
         new.attackers = [player_ids[id(p)] for p in self.attackers]
-        new.defender = player_ids.get(id(self.defender), None)
+        new.defender = player_ids[id(self.defender)] if self.defender else None
         new.draw_order = [player_ids[id(p)] for p in self.draw_order]
         new.player_to_play = player_ids[id(self.player_to_play)]
-        new.last_played_attacker = player_ids.get(id(self.last_played_attacker), None)
-        new.loser = player_ids.get(id(self.loser), None)
+        new.last_played_attacker = player_ids[id(self.last_played_attacker)] if self.last_played_attacker else None
+        new.loser = player_ids[id(self.loser)] if self.loser else None
 
         # Copy other attributes
         attrs_to_copy = [
@@ -608,13 +614,7 @@ class MoskaGame:
         new.history = self.history.copy()
 
         return new
-
-    # def clone_for_rollout(self):
-    # Old version with deepcopy (DEBUG PURPOSES)
-    #     from copy import deepcopy
-    #     new = deepcopy(self)
-    #     new.print_info = False
-    #     return new
+        
 
     def next(self):
         """Chooses and performs an action/move"""
@@ -634,7 +634,7 @@ class MoskaGame:
         # Display the action
         if self.print_info or not self.computer_shuffle:
             # Print the game state for computer players
-            if not isinstance(self.player_to_play, Human):
+            if not isinstance(self.player_to_play, HumanPlayer):
                 print(basic_repr_game(self))
             print(game_action_repr(self.player_to_play, action))
 

@@ -1,5 +1,5 @@
 import csv
-from moskaengine.utils.game_utils import StandardDeck
+from moskaengine import StandardDeck
 
 # Standard 52-card deck
 deck = StandardDeck(shuffle=False, perfect_info=True)

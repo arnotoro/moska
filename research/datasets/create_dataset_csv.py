@@ -1,17 +1,15 @@
-from moskaengine.players.random_player import RandomPlayer as Random
-from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
-from moskaengine.game.engine import MoskaGame
-
+import time
 import os
 import numpy as np
 import pandas as pd
 import uuid
-import time
 from multiprocessing import Pool, cpu_count, Queue, Process
 
+# Moskaengine imports
+from moskaengine import MoskaGame, RandomPlayer, MCTSPlayer
 
 def run_simulation(seed):
-    players = [Random('Random1'), Random('Random2'), Random('Random3'), Random('Random4')]
+    players = [RandomPlayer('Random1'), RandomPlayer('Random2'), RandomPlayer('Random3'), RandomPlayer('Random4')]
     computer_shuffle = True
     game = MoskaGame(players,
                      computer_shuffle,
@@ -25,9 +23,9 @@ def run_simulation(seed):
 
     return game.state_data, game.opponent_data
 
-def writer(queue, max_batch_size_mb=50):
-    save_folder_states = os.path.join("vectors/state")
-    save_folder_opponents = os.path.join("vectors/opponent")
+def writer(queue, max_batch_size_mb=50, total_games=1):
+    save_folder_states = os.path.join(f"vectors_{total_games}/state")
+    save_folder_opponents = os.path.join(f"vectors_{total_games}/opponent")
     os.makedirs(save_folder_states, exist_ok=True)
     os.makedirs(save_folder_opponents, exist_ok=True)
 
@@ -85,17 +83,17 @@ def writer(queue, max_batch_size_mb=50):
         state_df.to_csv(state_path, index=False, header=False)
         opp_df.to_csv(opp_path, index=False, header=False)
 
-
-def main():
+if __name__ == '__main__':
     total_games = 1
     print_every = 1
 
     queue = Queue(maxsize=cpu_count() * 2)
 
-    writer_process = Process(target = writer, args=(queue,10_000_000))
+    writer_process = Process(target = writer, args=(queue, 10_000_000, total_games))
     writer_process.start()
     completed = 0
 
+    start = time.time()
     with Pool(processes=cpu_count()) as pool:
         for state_data, opponent_data in pool.imap_unordered(run_simulation, range(total_games)):
             queue.put((state_data, opponent_data))
@@ -106,11 +104,8 @@ def main():
 
     queue.put("DONE")
     writer_process.join()
-
-if __name__ == '__main__':
-    start = time.time()
-    main()
+    
     end = time.time()
-    avg = (end - start) / 2000
-    print(f"Finished in {end - start:.2f} seconds")
+    avg = (end - start) / total_games
+    print(f"Finished in {end - start:.3f} seconds")
     print(f"Average time per game: {avg:.8f} seconds")

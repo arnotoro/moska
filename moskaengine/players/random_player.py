@@ -1,6 +1,5 @@
-from moskaengine.players.abstract_player import AbstractPlayer
-from moskaengine.utils.card_utils import choose_random_action
-
+from .abstract_player import AbstractPlayer
+from ..utils import choose_random_action
 
 class RandomPlayer(AbstractPlayer):
     def make_copy(self):

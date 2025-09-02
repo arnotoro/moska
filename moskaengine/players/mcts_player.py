@@ -1,12 +1,14 @@
-from moskaengine.players.abstract_player import AbstractPlayer
-from moskaengine.mcts.mcts import MCTS
-from moskaengine.game.deck import Card
 import random
 from collections import deque
-from moskaengine.utils.game_utils import check_unique_game_state
+
+# Moskaengine imports
+from ..game.deck import Card
+from ..mcts.mcts import MCTS
+from .abstract_player import AbstractPlayer
+from ..utils import check_unique_game_state
 
 
-class DeterminizedMCTS(AbstractPlayer):
+class MCTSPlayer(AbstractPlayer):
     """
 
 
@@ -23,7 +25,7 @@ class DeterminizedMCTS(AbstractPlayer):
 
 
     def make_copy(self):
-        new = DeterminizedMCTS(self.name)
+        new = MCTSPlayer(self.name)
         new.hand = self.hand.copy()
         return new
 
@@ -120,7 +122,7 @@ class DeterminizedMCTS(AbstractPlayer):
             copied = self.randomly_determinize(copied)
 
             # Check uniqueness of the determinized state
-            check_unique_game_state(copied)
+            # check_unique_game_state(copied)
 
             # Search tree from previous iterations
             search_tree = game_state.player_to_play.mcts

@@ -1,11 +1,13 @@
-from moskaengine.game.deck import StandardDeck
-
-from collections import deque
+import time
 import os
 import csv
 import uuid
+from collections import deque
 from pathlib import Path
-import time
+
+# Moskaengine improts
+from ..game.deck import StandardDeck
+
 
 def state_as_vector(game_state, file_format ="numpy"):
     # The current game state as a vector representation. More details: roadmap.md
@@ -61,30 +63,37 @@ def _game_state_as_vector(game_state):
     Convert the game state to a vector representation.
     """
     vector = []
-    killed_list = []
-    actions = {
-        "Attack": 1,
-        "Defend": 2,
-        "PlayFromDeck": 3,
-        "ThrowCards": 4,
-        "Skip": 5,
-        "TakeDefend": 6,
-        "TakeAll": 7,
-    }
 
     # The cards left in the deck
     vector.append(len(game_state.deck.cards))
+
+    # The trump suit (multi-hot encoding of 4 suits) (clubs, spades, hearts, diamonds)
+    # 0 = clubs, 1 = spades, 2 = hearts, 3 = diamonds
+    # The trump suit is encoded as a one-hot vector of length 4
+    # e.g., [1, 0, 0, 0] for clubs, [0, 1, 0, 0] for spades, etc.
+    trump_suit = game_state.trump_card.suit
+    trump_vector = [0] * 4
+    if trump_suit == 1:
+        trump_vector[0] = 1  # Clubs
+    elif trump_suit == 2:
+        trump_vector[1] = 1  # Spades
+    elif trump_suit == 3:
+        trump_vector[2] = 1  # Hearts
+    elif trump_suit == 4:
+        trump_vector[3] = 1  # Diamonds
+    vector.extend(trump_vector)
 
     # The cards on the table
     vector.extend(_encode_cards(game_state.cards_to_defend))
 
     # The discarded cards i.e., not in the game anymore
-    for item in game_state.cards_discarded:
-        killed_list.append(item)
-    vector.extend(_encode_cards(killed_list))
+    vector.extend(_encode_cards(game_state.cards_discarded))
 
-    # The current player idx (1-4)
-    vector.append((game_state.players.index(game_state.player_to_play) + 1))
+    # The current player idx, multi-hot encoding of 4 players
+    # 1 = player 1, 2 = player 2, 3 = player 3, 4 = player 4
+    player_id_vector = [0] * len(game_state.players)
+    player_id_vector[game_state.players.index(game_state.player_to_play)] = 1
+    vector.extend(player_id_vector)
 
     # Current player's hand
     vector.extend(_encode_cards(game_state.player_to_play.hand))
@@ -96,29 +105,55 @@ def _game_state_as_vector(game_state):
     vector.append(game_state.n_turns)
 
     # Move history for the last N turns, default 5
-    player_indices = {pl.name: idx + 1 for idx, pl in enumerate(game_state.players)}
+    actions = {
+        "Attack": 1,
+        "Defend": 2,
+        "PlayFromDeck": 3,
+        "ThrowCards": 4,
+        "Skip": 5,
+        "TakeDefend": 6,
+        "TakeAll": 7,
+    }
+    n_actions = len(actions)
+    n_players = len(game_state.players)
+    history_len = (n_actions + n_players+ 52)  # action_type one-hot, player_idx one-hot + 52 cards multi-hot
 
-    history_len = 2 + 52 # action_type, player_idx + 52 cards
+    
     turn_history = deque([[0] * history_len for _ in range(game_state.N_HISTORY)], maxlen=game_state.N_HISTORY)
 
-    # The last N turns
+    # Map player names to indices (0-3)
+    player_indices = {pl.name: idx for idx, pl in enumerate(game_state.players)}
+
     for move in game_state.history[-game_state.N_HISTORY:]:
         move_type, move_player = move[0][0], move[1]
         move_cards = move[0][1]
-        action_idx = actions.get(move_type, 0)
-        player_idx = player_indices.get(move_player, 0)
 
-        if isinstance(move_cards, (tuple, list)):
+        # Encode action as one-hot vector
+        action_idx = actions.get(move_type, -1)
+        action_vec = [0] * n_actions
+        if 0 <= action_idx < n_actions:
+            action_vec[action_idx - 1] = 1
+
+        # Encode player index as one-hot vector
+        player_idx = player_indices.get(move_player, -1)
+        player_vec = [0] * n_players
+        if 0 <= player_idx < n_players:
+            player_vec[player_idx] = 1
+
+        # Cards played in the move as a multi-hot vector
+        if move_cards is None:
+            cards_vec = [0] * 52
+        elif isinstance(move_cards, (tuple, list)):
             if not move_cards[1]:
                 cards_vec = _encode_cards([move_cards[0]])
             else:
                 cards_vec = _encode_cards([move_cards[0], move_cards[1]])
-        elif move_cards is None:
-            cards_vec = [0] * 52
         else:
             cards_vec = _encode_cards([move_cards])
 
-        turn_history.append([action_idx, player_idx] + cards_vec)
+        # Combine all vectors
+        combined_vec = action_vec + player_vec + cards_vec
+        turn_history.append(combined_vec)
 
     # Flatten the history
     flat_history = [item for turn in turn_history for item in turn]

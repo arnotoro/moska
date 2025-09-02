@@ -1,10 +1,10 @@
-from moskaengine.players.abstract_player import AbstractPlayer
-from moskaengine.utils.card_utils import basic_repr_game, basic_repr_player_actions
+# Moskaengine imports
+from .abstract_player import AbstractPlayer
+from ..utils import basic_repr_game, basic_repr_player_actions
 
-
-class Human(AbstractPlayer):
+class HumanPlayer(AbstractPlayer):
     def make_copy(self):
-        new = Human(self.name)
+        new = HumanPlayer(self.name)
         new.hand = self.hand.copy()
         return new
 
@@ -63,7 +63,7 @@ class Human(AbstractPlayer):
 
         # Check if the action type is 'ThrowCards' and there is only one choice i.e. no card to throw
         # NOTE: Very unintuitive...
-        if len(choices) == 1 and action_type == 'Skip':
+        if len(action_types) == 1 and action_type == 'Skip':
             return action_type, choices[0]
 
         if action_type == 'Attack':
@@ -202,39 +202,49 @@ class Human(AbstractPlayer):
 
         elif action_type == 'ThrowCards':
             while True:
-                # Print the choices for the player
+                print(f"Allowed cards to throw: {choices}")
+                
+                # If only one choice, auto-throw
+                if len(choices) == 1:
+                    return action_type, choices[0]
+
+                # Print options
                 for i, choice in enumerate(choices):
-                    print(f"{i+1}. {repr(choice[0])}")
+                    print(f"{i+1}. {repr(choice)}")
 
-                move_input = input(f"Enter the index of the card you want to throw to table (multiple seperated by space): ")
+                move_input = input("Enter the index(es) of the card(s) you want to throw (separated by spaces): ")
 
-                # Parse the input
+                def get_value(card):
+                    return card[1] if isinstance(card, tuple) else card.value
+
                 try:
                     move = move_input.split()
-                    selected = []
+                    selected = [choices[int(idx) - 1] for idx in move]
 
-                    for card in move:
-                        selected.append(choices[int(card)-1])
+                    print(move, selected)
 
-                    # Validate cards
-                    if all(card in choices for card in selected):
 
-                        if len(selected) > 1:
-                            values = [card[1] for card in selected]
-                            if len(set(values)) == 1:
-                                return action_type, selected
-                            else:
-                                print("Error: When playing multiple cards, all must have the same value.\n")
-                                continue
+                    # # Validate selection
+                    # if not all(get_value(card) in choices for card in selected):
+                    #     invalid = [card for card in selected if card not in choices]
+                    #     print(f"Invalid card(s): {invalid}")
+                    #     continue
+
+                    # If multiple cards, check all values are equal
+                    if len(selected) > 1:
+                        # Works for both tuples and Card objects
+
+                        values = [get_value(card) for card in selected]
+
+                        if len(set(values)) == 1:
+                            return action_type, selected
                         else:
-                            return action_type, selected[0]
+                            print("Error: When playing multiple cards, all must have the same value.\n")
+                            continue
                     else:
-                        invalid_cards = [card for card in selected if card not in choices]
-                        print(f"Invalid card(s): {invalid_cards}")
-                        valid_cards = " ".join(f"{c[0]},{c[1]}" for c in choices)
-                        print(f"Valid cards are: {valid_cards}")
-                except (ValueError, IndexError, SyntaxError, NameError):
-                    print(
-                        "Input error. Please enter the indexes of the cards you want to play as numbers separated by spaces.\n")
+                        return action_type, selected[0]
+
+                except (ValueError, IndexError):
+                    print("Input error. Please enter valid indexes separated by spaces.\n")
         else:
             raise NotImplementedError

@@ -1,20 +1,17 @@
-from moskaengine.players.random_player import RandomPlayer as Random
-from moskaengine.players.determinized_mcts_player import DeterminizedMCTS
-from moskaengine.players.heuristic_player import HeuristicPlayer as Heuristic
-from moskaengine.game.engine import MoskaGame
-
 import os
+import time
+import datetime
+import uuid
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
-import uuid
-import datetime
-import time
 from multiprocessing import Pool, cpu_count, Queue, Process
 
+# Moskaengine imports
+from moskaengine import MoskaGame, HeuristicPlayer, RandomPlayer, MCTSPlayer
 
 def run_simulation(seed):
-    players = [Heuristic('Heuristic1'), Heuristic('Heuristic2'), Heuristic('Heuristic3'), Heuristic('Heuristic4')]
+    players = [HeuristicPlayer('Heuristic1'), HeuristicPlayer('Heuristic2'), HeuristicPlayer('Heuristic3'), HeuristicPlayer('Heuristic4')]
     computer_shuffle = True
     game = MoskaGame(players,
                      computer_shuffle,
@@ -26,13 +23,12 @@ def run_simulation(seed):
 
     return game.state_data, game.opponent_data
 
-def writer(queue, max_batch_size_mb=50):
+def writer(queue, max_batch_size_mb=50, total_games=1):
     # Add timestamp to ensure uniqueness
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    base_path = f"../../vectors_50k"
-    save_folder_states = os.path.join(base_path, "state")
-    save_folder_opponents = os.path.join(base_path, "opponent")
+    save_folder_states = os.path.join(f"vectors_{total_games}/state")
+    save_folder_opponents = os.path.join(f"vectors_{total_games}/opponent")
 
     os.makedirs(save_folder_states, exist_ok=True)
     os.makedirs(save_folder_opponents, exist_ok=True)
@@ -108,16 +104,17 @@ def writer(queue, max_batch_size_mb=50):
 
         pq.write_table(opp_table, opp_path, compression='snappy')
 
-def main():
-    total_games = 50_000
-    print_every = 1000
+if __name__ == '__main__':
+    total_games = 50
+    print_every = 10
 
     queue = Queue(maxsize=cpu_count() * 2)
 
-    writer_process = Process(target = writer, args=(queue,10_000_000))
+    writer_process = Process(target = writer, args=(queue, 10_000_000, total_games))
     writer_process.start()
     completed = 0
 
+    start = time.time()
     with Pool(processes=cpu_count()) as pool:
         for state_data, opponent_data in pool.imap_unordered(run_simulation, range(total_games)):
             queue.put((state_data, opponent_data))
@@ -128,11 +125,7 @@ def main():
 
     queue.put("DONE")
     writer_process.join()
-
-if __name__ == '__main__':
-    start = time.time()
-    main()
     end = time.time()
-    avg = (end - start) / 2000
+    avg = (end - start) / total_games
     print(f"Finished in {end - start:.2f} seconds")
     print(f"Average time per game: {avg:.8f} seconds")

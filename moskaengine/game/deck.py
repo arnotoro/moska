@@ -199,5 +199,7 @@ class StandardDeck:
     def copy(self):
         "Returns a deep copy of the deck."
         new_deck = StandardDeck(shuffle=False, seed_value=self.seed_value)
-        new_deck.cards = deque(card.make_copy() for card in self.cards)
+        cards = self.cards
+        make = Card.make_copy
+        new_deck.cards = deque(make(card) for card in cards) # faster via local
         return new_deck

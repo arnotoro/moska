@@ -1,6 +1,8 @@
-from math import log, sqrt
-from moskaengine.utils.card_utils import choose_random_action
 import random
+from math import log, sqrt
+
+# Moskaengine imports
+from ..utils import choose_random_action
 
 class Node:
     """
@@ -53,21 +55,6 @@ class Node:
         # Find the best child using UCT
         best = max(children, key=uct)
         return best[0], self.children[best[0]]
-        # best_value = float('-inf')
-        # best_action = None
-        # best_node = None
-        #
-        # for action, child in self.children.items():
-        #     if child.N == 0:
-        #         continue
-        #     uct = (child.W / child.N) + const / sqrt(child.N)
-        #     if uct > best_value:
-        #         best_value = uct
-        #         best_action = action
-        #         best_node = child
-        #
-        # assert best_node is not None
-        # return best_action, best_node
 
 class MCTS:
     """
