@@ -58,4 +58,4 @@ To change the player configurations, edit the `sandbox.py` players list.
 ## License
 This project is licensed under the MIT License.
 
-The game engine and MCTS implementation for Moska is a heavily modified version from a similar [Durak implementation](https://github.com/jorisperrenet/durak), which is a related card game to Moska due to the similarities in gameplay. Inspiration for the project was also drawn from previous research on Moska by a fellow student and a good friend of mine. His work can be found [here](https://github.com/ilmari99/MoskaResearch). 
+The game engine and MCTS implementation for Moska is a heavily modified version from a similar [Durak](https://github.com/jorisperrenet/durak) implementation, which is a related card game to Moska due to the similarities in gameplay. Inspiration for the project was also drawn from previous research on Moska by a fellow student and a good friend of mine. His work can be found [here](https://github.com/ilmari99/MoskaResearch). 
