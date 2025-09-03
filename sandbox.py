@@ -14,16 +14,21 @@ import numpy as np
 from research import HandPredictMLP
 from moskaengine import MoskaGame, HumanPlayer, RandomPlayer, MCTSPlayer, HeuristicPlayer, NNMCTSPlayer
 
-siemen = random.randint(0, 1000000)
-# random.seed(siemen)
-print(f"Used seed: {siemen}")
-random.seed(siemen) # For debug
+players = [
+    HumanPlayer('me'),
+    HeuristicPlayer('H2'),
+    HeuristicPlayer('H3'),
+    # MCTS Players, uncomment to use
+    MCTSPlayer('MCTS', deals=3, rollouts=250, expl_rate=1.7, scoring="win_rate"),
+    # NNMCTSPlayer('NNMCTS', model=model, scaler=scaler, device=device, deals=3, rollouts=100, expl_rate=1.7, scoring="win_rate")
+]
 
+# Uncomment if using NNMCTSPlayer
 # # Cuda
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # print(f"Using device: {device}")
 
-# # Load the model for DeterminizedMLPMCTS
+# # Load the model
 # model_path = "models/hand_predict_mlp_25k_95epochs.pth"
 # checkpoint = torch.load(model_path, map_location=torch.device('cpu'), weights_only=False)
 
@@ -45,14 +50,12 @@ random.seed(siemen) # For debug
 
 # print("Model and scaler loaded successfully.")
 
-
-players = [HumanPlayer('me'), HeuristicPlayer('H2'), HeuristicPlayer('H3'), MCTSPlayer('MCTS', deals=10, rollouts=750, expl_rate=1.7, scoring="win_rate")]
-# players = [HumanPlayer('me'), HeuristicPlayer('H2'), HeuristicPlayer('H3'), DeterminizedMLPMCTS('NNMCTS', model, scaler, device, deals=10, rollouts=750, expl_rate=math.sqrt(2), scoring="win_rate")]
-
-computer_shuffle = True
+siemen = random.randint(0, 1000000)
+random.seed(siemen)
+print(f"Used seed: {siemen}") # For debug
 
 start = time.time()
-game = MoskaGame(players, computer_shuffle, perfect_info=False, save_vectors=False, print_info=False)
+game = MoskaGame(players, computer_shuffle=True, perfect_info=False, save_vectors=False, print_info=True)
 while not game.is_end_state:
     game.next()
 
